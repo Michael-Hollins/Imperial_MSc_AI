@@ -1,0 +1,114 @@
+\documentclass[12pt,twoside]{report}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand\fnote[1]{\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}\subcaption*{\textit{#1}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\reporttitle}{Title}
+\newcommand{\reportauthor}{Michael David Hollins}
+\newcommand{\supervisor}{Dr Ovidiu Serban}
+\newcommand{\degreetype}{MSc AI}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% load some definitions and default packages
+\input{includes}
+\input{notation}
+\date{September 2024}
+
+\begin{document}
+
+% load title page
+\input{titlepage}
+
+
+% page numbering etc.
+\pagenumbering{roman}
+\clearpage{\pagestyle{empty}\cleardoublepage}
+\setcounter{page}{1}
+\pagestyle{fancy}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{abstract}
+Your abstract.
+\end{abstract}
+
+\cleardoublepage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section*{Acknowledgments}
+Comment this out if not needed.
+
+\clearpage{\pagestyle{empty}\cleardoublepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%--- table of contents
+\fancyhead[RE,LO]{\sffamily {Table of Contents}}
+\tableofcontents 
+
+
+\clearpage{\pagestyle{empty}\cleardoublepage}
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\fancyhead[LE,RO]{\slshape \rightmark}
+\fancyhead[LO,RE]{\slshape \leftmark}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Introduction}
+
+\begin{figure}[tb]
+\centering
+\includegraphics[width = 0.4\hsize]{./figures/imperial}
+\caption{Imperial College Logo. It's nice blue, and the font is quite stylish. But you can choose a different one if you don't like it.}
+\label{fig:logo}
+\end{figure}
+
+Figure~\ref{fig:logo} is an example of a figure. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Background}
+
+Geological records suggest that thousands of years ago much of world was covered in ice, but how could the climate possibly have changed so radically? Beginning in the mid-1800s, some scientists argued that gases such as carbon dioxide and methane caused a so-called ``greenhouse effect'', affecting the planet's temperature through trapping heat. Consistent with this theory, during the twentieth century scientists observed rising global surface temperatures alongside steep increases to atmospheric concentrations of greenhouse gases (GHG). Accordingly, mainstream scientific consensus has coalesced around the view that the earth's recent climate change is mostly driven by human activity as the increased combustion of fossil fuels has released GHGs into the atmosphere \cite{IPCC2021, RS2020}. 
+
+\begin{figure}[H]
+\centering
+\caption{Global average temperature anomalies and greenhouse gas emissions}
+	\begin{subfigure}[t]{0.475\textwidth}
+		\centering
+		\caption{Average global temperature anomaly}
+		\includegraphics[width=\linewidth]{world\_temp\_anomalies.png}
+		\fnote{Source: \href{https://ourworldindata.org/co2-and-greenhouse-gas-emissions}{Our World in Data \cite{Ritchie2023}}. Global average land-sea temperature anomaly relative to the 1961-1990 average temperature, in degrees Celsius.}
+		\label{fig:WorldTempAnomalies}
+	\end{subfigure}
+	~~
+	\begin{subfigure}[t]{0.475\textwidth}
+		\centering
+		\caption{Global greenhouse gas emissions}
+		\includegraphics[width=\linewidth]{world\_ghg\_emissions.png}
+		\fnote{Source: \href{https://ourworldindata.org/co2-and-greenhouse-gas-emissions}{Our World in Data \cite{Ritchie2023}}. Greenhouse gas emissions include carbon dioxide, methane and nitrous oxide from all sources, including land-use change. They are measured in billions of tonnes of carbon dioxide-equivalents over a 100-year timescale.}
+		\label{fig:WorldGHGEmissions2}
+	\end{subfigure}
+\end{figure}
+
+Accompanying the growing weight of scientific evidence was political conviction that something must be done. Consequently, landmark international treaties such as the 1997 Kyoto Protocol \cite{UN1997} and the 2015 Paris Agreement \cite{UNFCCC2020} legally mandated that developed countries reduce their GHG emissions. Following this scientific and political momentum around climate change, growing public awareness and concern has further catalysed domestic support for national targets such as Net Zero \cite{Poortinga2023}. 
+
+A corollary to GHG reduction targets is that emissions must be accurately measured. 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Contribution}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Experimental Results}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Conclusion}
+
+
+%% bibliography
+\bibliographystyle{plain}
+\bibliography{C:/localtexmf/bibtex/bib/mybibs/thesis_references}
+
+\end{document}
