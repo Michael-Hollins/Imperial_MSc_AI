@@ -1,3 +1,7 @@
+# Binary files in directory
+figures/
+primary_sources/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
