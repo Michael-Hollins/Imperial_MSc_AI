@@ -55,3 +55,6 @@ thesis_venv/
 ## Build tool directories for auxiliary files
 # latexrun
 latex.out/
+
+# Environment variables
+.env
