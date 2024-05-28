@@ -114,7 +114,7 @@ In accordance with \textit{The Greenhouse Gas Protocol Corporate Accounting and 
 \\ \\
 Considering the UK's policy in particular, the UK Government's stated ambition is to introduce mandatory Scope 3 reporting across the entire economy by 2025 in line with the recommendations of the TCFD \cite{ukgov2020}. This would require each reporting entity to ``comply or explain'' their Scope 3 emissions. In other words, if deemed material, each entity must report their Scope 3 GHG emissions in line with the GHG Protocol format. Meanwhile, for listed companies, since 2020 the Financial Conduct Authority (FCA) has phased in mandatory Scope 3 disclosures \cite{fca2020, fca2021}. 
 \\ \\
-\section{Scope 3 reporting}\label{sec:Scope3Reporting}
+\section{Scope 3 reporting} \label{sec:Scope3Reporting}
 Having set out the origins and development of GHG emission targets, it remains to consider what is required for a firm to comply with the GHG Protocol \textit{Corporate Value Chain (Scope 3) Accounting and Reporting Standard} \cite{ghgscope32013}. A detailed understanding of this process will help illuminate the issues with data quality which are covered in Section \ref{sec:Scope3Challenges}.
 \\ \\
 After the firm has divided its GHG emissions into direct and indirect, the first task is to \textbf{set the Scope 3 boundary}; in short, this means accounting for all Scope 3 emissions in the value chain and to disclose and justify any exclusions. This includes the gases contained in the Kyoto Protocol: carbon dioxide (C0\textsubscript{2}), methane (CH\textsubscript{4}), nitrous oxide (N\textsubscript{2}0), hydrofluorocarbons (HFCs), perfluorocarbons (PFCs) and lastly sulphur hexaflouride (SF\textsubscript{6}). Furthermore, the company is required to account for these emissions in their respective Scope 3 categories as listed in Table \ref{tab:Scope3Categories}. 
@@ -195,7 +195,9 @@ After the firm has divided its GHG emissions into direct and indirect, the first
 
 These distinct categories are designed to help firms organise, understand and report on the diversity of Scope 3 activities throughout their value chain. However, while aiming for completeness, it is clear that in some cases, accounting for all of these emissions will not be feasible.  Therefore, the GHG Protocol concedes that while some omissions are permitted, ``Companies should ensure that the scope 3 inventory appropriately reflects the GHG emissions of the company, and serves the decision-making needs of users, both internal and external to the company. In particular, companies should not exclude any activity that is expected to contribute significantly to the company's total scope 3 emissions'' (\cite{ghgscope32013}, p.60).  
 \\ \\
-After identifying the most likely sources of significant emissions in the value chain, the firm must then \textbf{collect data} for quantifying emissions in the Scope 3 categories. There are two main methods to do this. First, where the firm has access to direct emissions data, then they can simply use the direct measurement. In practice, the second method of calculation is much more common, in which the firm uses activity data and emission factors to estimate emissions. In any case, the actual or estimated emissions data is then converted into a carbon dioxide equivalent (C0\textsubscript{2}e) so that Scope 3 emissions can be aggregated and compared regardless of GHG type. 
+After identifying the most likely sources of significant emissions in the value chain, the firm must then \textbf{collect data} for quantifying emissions in the Scope 3 categories. There are two main methods to do this. First, where the firm has access to direct emissions data, then they can simply use the direct measurement. In practice, the second method of calculation is much more common, in which the firm uses activity data and emission factors to estimate emissions. In any case, the actual or estimated emissions data is then converted into a carbon dioxide equivalent (C0\textsubscript{2}e) so that Scope 3 emissions can be aggregated and compared regardless of GHG type. If any data remains missing, firms may use proxy data to fill gaps. 
+\\ \\
+Using this data, the firm must \textbf{estimate} their Scope 3 emissions for each category. Importantly, companies may use a combination of calculation methods both within and across categories. There are three calculation methods outlined in the Scope 3 Technical Guidance and recognised by the literature \cite{ghgscope32013, GoldhammerEtAl2017}. First, there is a process analysis (PA) approach which is bottom-up: it uses primary and secondary production process data and its associated carbon emissions. This has a high level of specificity and focus but may be costly or impossible data to collect. Second, there is input-output analysis (IOA) which is top-down: it uses the input-output tables in the national accounts to allocate the carbon emissions of the economy to smaller units on a sectoral basis. This approach is simple to apply but by providing only averages in a population, it lacks specificity, nuance, and it is difficult to show the results of reduction efforts. Third, there are hybrid approaches which combine PA and IOA which try to combine the strengths of both: under this approach, companies usually begin bottom-up and then fill any remaining gaps top-down \cite{Crawford2008}. 
 \\ \\
 Finally, to comply with the GHG Protocol Scope 3 Standard \cite{ghgscope32013}, the firm must \textbf{report} their Scope 3 emissions with the following requirements:
 \begin{itemize}
@@ -213,7 +215,7 @@ These reporting requirements are clearly not trivial. Such is the nature and ext
 
 \section{Scope 3 data challenges}\label{sec:Scope3Challenges}
 
-Early studies exploring the nascent Scope 3 assessments found that the data were largely incomplete and lacking rigour \cite{DownieStubbs2013}. Moreover, even after a decade, a report by FTSE-Russell concluded that the data were still characterised by large gaps and poor quality \cite{ftserussell2024}. This suggests that something in the data generating process (as outlined above in Section \ref{sec:Scope3Reporting}) could be driving these inadequate outcomes. This Section describes the main shortcomings of Scope 3 disclosures identified in the literature. Beginning with a review of challenges inherent in the data generating process, we subsequently highlight the problems this causes downstream data analysis. 
+Early studies exploring the nascent Scope 3 assessments found that the data were largely incomplete and lacking rigour \cite{DownieStubbs2013}. Moreover, even after a decade, a report by FTSE-Russell concluded that the data were still characterised by large gaps and poor quality \cite{ftserussell2024}. Furthermore, it appears that rather than getting better, Scope 3 data is actually becoming less consistent over time \cite{Busch2022}. This suggests that something in the data generating process (as outlined above in Section \ref{sec:Scope3Reporting}) could be driving these inadequate outcomes. This Section describes the main shortcomings of Scope 3 disclosures identified in the literature. Beginning with a review of challenges inherent in the data generating process, we subsequently highlight the problems this causes downstream data analysis. 
 
 \subsection{Issues with the data generating process}\label{sec:DataGenIssues}
 
@@ -233,40 +235,49 @@ Finally, even when firms report their Scope 3 emissions, they may choose to omit
 
 \subsection{Consequential problems for data analysis}
 
-Together, the three problems in Section \ref{sec:DataGenIssues} prove a major hinderance to analysis. Common issues include:
-\begin{itemize}
-	\item Missing data
-	\item Biased data
-	\item Volatile data
-	\item Lack of comparability
-\end{itemize}
+Together, the three problems in Section \ref{sec:DataGenIssues} prove a major hinderance to analysis. 
+\subsubsection{Missing data}
+The main reason for the paucity of data comes from the nature of Scope 3 emissions: in contrast to Scopes 1 and 2, they are by construction emissions in the value chain beyond the firm's direct control or ownership and thereby are much more challenging for a firm to collect. Accordingly, across various datasets, Scope 3 coverage typically exists for only around half of firms.\footnote{45\% of FTSE All-World constituents report Scope 3 data as of 2021 \cite{ftserussell2024}. For firms reporting to the CDP, 41\% of disclosed emissions for one or more Scope 3 category in 2022 \cite{cdp2023}. Bloomberg and Refinitiv Eikon appear to have slightly higher proportions \cite{Nguyenetal2023}.} Furthermore, as reporting remains voluntary and the propensity to report depends on firms' characteristics such as size, sector, and reporting jurisdiction, the missing data should be assumed to be `missing not at random' (MNAR). However, current estimation models used by data providers often do not take this uncertainty into account, leading to misleading prediction intervals and inaccurate predictions \cite{olesiewicz2021}. In this way, missing data is closely related to biased data, the second problem in analysis. 
 
+\subsubsection{Biased data}
+Whereas a firm which is non-reporting is conspicuous by its absence, a more subtle problem is when a firm underreports due to boundary incompleteness and activity exclusion. Without close scrutiny of a firm's methodology, the researcher risks assuming that the reported total Scope 3 emissions is an accurate reflection of its carbon footprint, rather than a reflection of what they choose to measure and report. This problem also further degrades the data generating process; as most firms which self-report underreport their emissions, firms which benchmark themselves to peer averages also underreport as a result \cite{Hoepner2021}. Both problems of missing data (nonreporting) and biased data (underreporting) are illustrated by Figure \ref{fig:Scope3Coverage}, which shows that most firms don't report their Scope 3 data (one minus the orange line), and for those that do, they mostly report immaterial figures (gap between orange and green line). 
 
-\subsection{Missing data}
-Consequently, the problem of missing data remains acute. Recent surveys have found that less than 50\% of firms reported emissions for at least one Scope 3 category, and only 20\% reported material Scope 3 emissions \cite{cdp2023, ftserussell2024}. 
+\begin{figure}[H]
+\centering
+\caption{Global average temperature anomalies and greenhouse gas emissions}
+	\begin{subfigure}[t]{0.475\textwidth}
+		\centering
+	      \caption{Percentage of FTSE All-World constituents disclosing Scope 1, 2, 3 emissions}
+	      \label{fig:Scope3Coverage}
+	      \includegraphics[width=\linewidth]{data\_coverage.png}
+	      \fnote{Source: FTSE-Russell \cite{ftserussell2024}}
+	\end{subfigure}
+	~~
+	\begin{subfigure}[t]{0.475\textwidth}
+		\centering
+		\caption{Percentage of reported Scope 3 data within YoY variation thresholds}
+		\label{fig:Scope3Volatility}
+		\includegraphics[width=\linewidth]{data\_volatility.png}
+		\fnote{Source: FTSE-Russell \cite{ftserussell2024}, reporting entities are from the FTSE All-World constituents that disclose Scope 3 emissions}
+	\end{subfigure}
+\end{figure}
+
+\subsubsection{Volatile data}
+The relative immaturity of Scope 3 reporting is reflected in the high volatility of the data (see Figure \ref{fig:Scope3Volatility}). As of 2021, over half of the disclosed values vary by over 20\% year-on-year, and over a third vary by at least 50\%. Although this is something that could improve over time as reporting practices evolve, any forecasting exercise using this past data will likely be struggle with robustness. Moreover, parameter estimates are unlikely to be statistically significant due to the wide confidence intervals derived from the noisy data.
+
+\subsubsection{Lack of consistency and comparability}
+Besides errors, revisions, and omissions that may arise from the complex task of reporting Scope 3 emissions, there are other reasons why the data may not be comparable across firms or data sources. First, despite what may appear an overly prescriptive approach in Section \ref{sec:Scope3Reporting}, the GHG Protocol is flexible enough to provide a wide latitude in accounting and reporting methodologies. Firms must make a number of choices including their organisational boundaries, which categories to report/deem material, the calculation approach for each category, data sources, how to allocate emissions, whether to report optional extras above the minimum boundaries etc. As long as these choices can be justified according to the five accounting principles (relevance, completeness, consistency, transparency, accuracy) then they are said to conform to Scope 3 reporting standards \cite{ghgscope32013}. This methodological flexibility opens the possibility for large heterogeneity in firms' accounting and reporting their Scope 3 emissions: firms may be consistent with respect to themselves, but aggregating them into a portfolio risks comparing apples and oranges (see Box 2 in \cite{ftserussell2024} for an illustration). 
 \\ \\
-Aside from there being no legal obligation, the obvious reason for the paucity of data comes from the nature of Scope 3 emissions itself. They are by definition emissions in the value chain beyond the firm's direct control or ownership. Moreover, the 
-
-Of companies disclosing to CDP (formerly the Climate Disclosure Project), only 41\% reported emissions for one or more Scope 3 categories in 2022, despite those emissions being on aerage 11.4 times higher than operational (i.e Scopes 1 and 2) emissions \cite{cdp2022}. 
-
-\subsection{Partial reporting}
-- Availability bias
-- Material data left out/ what is significant? 
-- Report different numbers (see references in Klassen p.2)
-
-\subsection{Volatility}
-- Changes often unexplained
-
-\subsection{Lack of comparability}
-- Wide latitude in methodology
-- Categories are not always obvious
+Second, the GHG Protocol and Scope 3 Guidance is often complimented with standard setters' frameworks and legal requirements. While these may intend to be aligned to the GHG, invariably they introduce particular interpretations which their signatories are expected to adopt. This could lead to additional inconsistencies, especially between sectors. For example, many financial institutions have adopted the Partnership for Carbon Accounting Financials (PCAF) in an attempt to enhance reporting quality for Category 15 of Scope 3 emissions \cite{PCAF2022}. However, as pointed out by Tang et al. \cite{Tang2023}, the practical considerations of GHG estimation means that PCAF's framework may provide contradictory guidance, leading to non-standardisation, inaccuracy and inconsistency. 
+\\ \\
+When researchers wish to compare the GHG emissions of many firms, or investors want to evaluate the transition risk of their portfolio, they frequently turn to third party data providers such as Bloomberg, CDP, ISS-Ethix, MSCI, Sustainalytics, Thomas Reuters, and Trucost.  The main issue is that data often has to be estimated to fill in the gaps, and unfortunately data providers each use their own methodologies of varying transparency. These different approaches can compound the inconsistency across the data and make it challenging for people to know what the ``real'' Scope 3 emissions are of a collection of firms. For example, Busch et al. \cite{Busch2022} found that third-party estimated data is less consistent as compared to data stemming directly from coroprate reports, that this inconsistency is increasing over time, and that the choice of a particular data provider may significantly affect empirical results. Surprinsgly, Nguyen et al. \cite{Nguyenetal2023} found that diveregence even exists between datasets for emissions values that have been reported by firms, having only 68\% identical data points between Bloomberg and Refinitiv Eikkon. Moreover, Kalesnik et al. \cite{KalesnikVitali2022} argue that these estimates aren't just inconsistent but they're also low quality. 
 
 \section{Attempts to model Scope 3 emissions}\label{sec:Scope3Modelling}
-
+Mind the gaps: modelling techniques applied to S1 and 2: still struggle. 
 Data coverage and modelling/literature. 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Data}\label{sec:Data}
-
+\chapter{Empirical Approach}\label{sec:EmpiricalApproach}
+The literature suggests that data stemming from corporate reports is more consistent than data generated from third-party estimates \cite{Busch2022}. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Experimental Results}
