@@ -57,3 +57,6 @@ latex.out/
 
 # Environment variables
 *.env
+
+# Report pdf
+report/*.pdf

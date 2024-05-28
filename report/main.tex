@@ -58,7 +58,7 @@ Comment this out if not needed.
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width = 0.4\hsize]{./figures/imperial}
+\includegraphics[width = 0.4\hsize]{imperial}
 \caption{Imperial College Logo. It's nice blue, and the font is quite stylish. But you can choose a different one if you don't like it.}
 \label{fig:logo}
 \end{figure}
@@ -110,9 +110,9 @@ To help delineate this further, three ``scopes'' are defined for GHG accounting 
 	\fnote{Source: \cite{ghgscope32013}, p.6}
 \end{figure}
 
-In accordance with \textit{The Greenhouse Gas Protocol Corporate Accounting and Reporting Standard}, many jurisdictions require mandatory Scope 1 and Scope 2 disclosures for publicly listed firms, including in the EU \cite{eu20232772}, the US \cite{sec2024}, the UK \cite{ukleg2018} and Japan \cite{fsa2022}. Furthermore, although at the moment Scope 3 reporting is optional in these key financial markets, the regulatory landscape in all of them is shifting away from voluntary efforts and towards mandatory Scope 3 disclosures \cite{ftserussell2024}. 
+In accordance with \textit{The Greenhouse Gas Protocol Corporate Accounting and Reporting Standard}, many jurisdictions require (or will soon require) mandatory Scope 1 and Scope 2 disclosures for publicly listed firms, including in the EU \cite{eu20232772}, the US \cite{sec2024}, the UK \cite{ukleg2018} and Japan \cite{fsa2022}. Furthermore, although at the moment Scope 3 reporting is optional in these key financial markets, the regulatory landscape in all of them is shifting away from voluntary efforts and towards mandatory Scope 3 disclosures \cite{ftserussell2024}. 
 \\ \\
-Considering the UK's policy in particular, the UK Government's stated ambition is to introduce mandatory Scope 3 reporting across the entire economy by 2025 in line with the recommendations of the TCFD \cite{ukgov2020}. This would require each reporting entity to ``comply or explain'' their Scope 3 emissions. In other words, if deemed material, each entity must report their Scope 3 GHG emissions in line with the GHG Protocol format. Meanwhile, for listed companies, since 2020 the Financial Conduct Authority (FCA) has phased in mandatory Scope 3 disclosures \cite{fca2020, fca2021}. 
+The UK is one of the most progressive jurisdictions in climate reporting. For listed companies, since 2020 the Financial Conduct Authority (FCA) has phased in mandatory Scope 3 disclosures \cite{fca2020, fca2021}. Moreover, since 2022 the government has required over 1,300 of the largest firms to disclose climate-related infromation, including not just traded companies but also private companies with over 500 employees and £500 million in  \cite{UK2021}. Building on this further, the UK Government's stated ambition is to introduce mandatory Scope 3 reporting across the entire economy by 2025 in line with the recommendations of the TCFD \cite{ukgov2020}. 
 \\ \\
 \section{Scope 3 reporting} \label{sec:Scope3Reporting}
 Having set out the origins and development of GHG emission targets, it remains to consider what is required for a firm to comply with the GHG Protocol \textit{Corporate Value Chain (Scope 3) Accounting and Reporting Standard} \cite{ghgscope32013}. A detailed understanding of this process will help illuminate the issues with data quality which are covered in Section \ref{sec:Scope3Challenges}.
@@ -270,14 +270,15 @@ Besides errors, revisions, and omissions that may arise from the complex task of
 \\ \\
 Second, the GHG Protocol and Scope 3 Guidance is often complimented with standard setters' frameworks and legal requirements. While these may intend to be aligned to the GHG, invariably they introduce particular interpretations which their signatories are expected to adopt. This could lead to additional inconsistencies, especially between sectors. For example, many financial institutions have adopted the Partnership for Carbon Accounting Financials (PCAF) in an attempt to enhance reporting quality for Category 15 of Scope 3 emissions \cite{PCAF2022}. However, as pointed out by Tang et al. \cite{Tang2023}, the practical considerations of GHG estimation means that PCAF's framework may provide contradictory guidance, leading to non-standardisation, inaccuracy and inconsistency. 
 \\ \\
-When researchers wish to compare the GHG emissions of many firms, or investors want to evaluate the transition risk of their portfolio, they frequently turn to third party data providers such as Bloomberg, CDP, ISS-Ethix, MSCI, Sustainalytics, Thomas Reuters, and Trucost.  The main issue is that data often has to be estimated to fill in the gaps, and unfortunately data providers each use their own methodologies of varying transparency. These different approaches can compound the inconsistency across the data and make it challenging for people to know what the ``real'' Scope 3 emissions are of a collection of firms. For example, Busch et al. \cite{Busch2022} found that third-party estimated data is less consistent as compared to data stemming directly from coroprate reports, that this inconsistency is increasing over time, and that the choice of a particular data provider may significantly affect empirical results. Surprinsgly, Nguyen et al. \cite{Nguyenetal2023} found that diveregence even exists between datasets for emissions values that have been reported by firms, having only 68\% identical data points between Bloomberg and Refinitiv Eikkon. Moreover, Kalesnik et al. \cite{KalesnikVitali2022} argue that these estimates aren't just inconsistent but they're also low quality. 
+When researchers wish to compare the GHG emissions of many firms, or investors want to evaluate the transition risk of their portfolio, they frequently turn to third party data providers such as Bloomberg, CDP, ISS-Ethix, MSCI, Sustainalytics, Thomas Reuters, and Trucost.  The main issue is that data often has to be estimated to fill in the gaps, and unfortunately data providers each use their own methodologies of varying transparency. These different approaches can compound the inconsistency across the data and make it challenging for people to know what the ``real'' Scope 3 emissions are of a collection of firms. For example, both Busch et al. \cite{Busch2022} and Kalesnik et al. \cite{KalesnikVitali2022}  found that the choice of a particular data provider may significantly affect empirical results and that third-party estimated data is less consistent as compared to data stemming directly from corporate reports. Concerningly, Busch et al. also found that third-party estimated data inconsistency is increasing over time.  However, even for values reported by firms, surprinsgly Nguyen et al. \cite{Nguyenetal2023} found that diveregence even exists between third-party datasets, having only 68\% identical data points between Bloomberg and Refinitiv Eikkon. 
+
 
 \section{Attempts to model Scope 3 emissions}\label{sec:Scope3Modelling}
 Mind the gaps: modelling techniques applied to S1 and 2: still struggle. 
 Data coverage and modelling/literature. 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Empirical Approach}\label{sec:EmpiricalApproach}
-The literature suggests that data stemming from corporate reports is more consistent than data generated from third-party estimates \cite{Busch2022}. 
+Several papers have argued that Scope 3 data is not yet appropriate for empirical analysis \cite{KalesnikVitali2022}. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Experimental Results}
@@ -289,6 +290,6 @@ The literature suggests that data stemming from corporate reports is more consis
 
 %% bibliography
 \bibliographystyle{plain}
-\bibliography{C:/localtexmf/bibtex/bib/mybibs/thesis_references}
+\bibliography{references}
 
 \end{document}
