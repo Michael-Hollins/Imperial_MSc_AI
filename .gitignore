@@ -57,4 +57,4 @@ thesis_venv/
 latex.out/
 
 # Environment variables
-scripts/.env
+*.env
