@@ -110,7 +110,7 @@ To help delineate this further, three ``scopes'' are defined for GHG accounting 
 	\fnote{Source: \cite{ghgscope32013}, p.6}
 \end{figure}
 
-In accordance with \textit{The Greenhouse Gas Protocol Corporate Accounting and Reporting Standard}, many jurisdictions require (or will soon require) mandatory Scope 1 and Scope 2 disclosures for publicly listed firms, including in the EU \cite{eu20232772}, the US \cite{sec2024}, the UK \cite{ukleg2013} and Japan \cite{fsa2022}. Furthermore, although at the moment Scope 3 reporting is optional in most of these key financial markets, the regulatory landscape is shifting away from voluntary efforts and towards mandatory Scope 3 disclosures \cite{ftserussell2024}. 
+In accordance with \textit{The Greenhouse Gas Protocol Corporate Accounting and Reporting Standard}, many jurisdictions require (or will soon require) mandatory Scope 1 and Scope 2 disclosures for publicly listed firms, including in the EU \cite{eu20232772}, the US \cite{sec2024}, the UK \cite{ukleg2013} and Japan \cite{fsa2022}. Furthermore, although Scope 3 reporting is currently optional in most of these key financial markets, the regulatory landscape is shifting away from voluntary efforts and towards mandatory Scope 3 disclosures \cite{ftserussell2024}. 
 \\ \\
 In particular, the UK is one of the most progressive jurisdictions in climate reporting. For listed companies, since 2020 the Financial Conduct Authority (FCA) has phased in mandatory Scope 3 disclosures \cite{fca2020, fca2021}. Moreover, since 2022 the government has required over 1,300 of the largest firms to disclose climate-related information, including not just traded companies but also private companies with over 500 employees and £500 million in  \cite{UK2021}. Building on this further, the UK Government's stated ambition is to introduce mandatory Scope 3 reporting across the entire economy by 2025 in line with the recommendations of the TCFD \cite{ukgov2020}. 
 \\ \\
@@ -274,25 +274,38 @@ Second, the GHG Protocol and Scope 3 Guidance is often complimented with standar
 \\ \\
 When researchers wish to compare the GHG emissions of many firms, or investors want to evaluate the transition risk of their portfolio, they frequently turn to third party data providers such as Bloomberg, CDP, ISS-Ethix, MSCI, Sustainalytics, Thomas Reuters, and Trucost.  The main issue is that data often has to be estimated to fill in the gaps, and unfortunately data providers each use their own methodologies of varying transparency. These different approaches can compound the inconsistency across the data and make it challenging for people to know what the ``real'' Scope 3 emissions are of a collection of firms. For example, both Busch et al. \cite{Busch2022} and Kalesnik et al. \cite{KalesnikVitali2022}  found that the choice of a particular data provider may significantly affect empirical results and that third-party estimated data is less consistent as compared to data stemming directly from corporate reports. Concerningly, Busch et al. also found that third-party estimated data inconsistency is increasing over time.  However, even for values reported by firms, surprisingly Nguyen et al. \cite{Nguyenetal2023} found that divergence still exists between third-party datasets, having only 68\% identical data points between Bloomberg and Refinitiv Eikon. 
 
-\section{Estimating Scope 3 emissions}\label{sec:Scope3Modelling}
+\section{Estimating GHG emissions}\label{sec:Scope3Modelling}
+There are two key takeaways from the literature estimating GHG emissions. First, very few papers attempt to estimate Scope 3 emissions, and more generally there are relatively few quantitative papers on Scope 3 emissions due to data quality and availability limitations \cite{Hettler2024}. Second, state-of-the-art techniques are found to deliver only marginal improvements versus relatively simple approaches \cite{Nguyenetal2023, FTSERussell2022, olesiewicz2021}. 
+\\ \\
+There is no industry consensus on what is the best approach for estimating GHG emissions \cite{FTSERussell2022}. Consequently, a common tactic is to try a battery of methods rather than favour a single methodology. We briefly recap the most common approaches below.
 
-Notwithstanding the problems with Scope 3 data, many papers have either tried to estimate Scope 3 emissions, either to fill in the missing gaps or to forecast future emissions. 
+\subsection{Input-output tables}
 
-\subsection{Modelling techniques}
+\subsection{Sector averages}
 
-There is no industry consensus on the best way to approach estimating GHG emissions \cite{FTSERussell2022}. Consequently, the standard tactic is to try a battery of methods and empirically observe which is the best for a particular exercise. 
+The simplest approach to estimating Scope 3 data is to fill missing values with the sector median. This has the advantages of being easy to implement and interpret, as well as the ability to adjust granularity based on further groupings such as subsectors and regions. The obvious drawback is that it ignores specific business models and other company information that may be relevant. 
+\\ \\
+Despite its simplicity, when compared to other estimation techniques, this approach performs relatively well. Nguyen et al. \cite{Nguyenetal2023} find that state-of-the-art machine learning techniques only provide marginal improvements on using sector medians. In addition, FTSE-Russell \cite{FTSERussell2022} find that sophisticated models only provide marginal improvements versus taking a simple sector median to predict GHG emissions. 
 
-\subsection{Filling in missing Scope 3 data}
+\subsection{Regression}
 
-While Scope 3 data may be missing, firms often report their Scope 1 and Scope 2 emissions. Unfortunately, with the exception of the utilities sector, a simple regression of Scope 1 and 2 emissions on Scope 3 reported emissions yields very little explanatory power \cite{ManGroup2022}. 
+Regression methods aim to model the linear relationships between variables. As with the sector median, Nguyen et al. \cite{Nguyenetal2023} report that their baseline ``naive'' (i.e. using just revenue and employees variables) regression model holds up well against most of the state-of-the-art techniques including machine learning methods. Again, this underlines that simple models perform surprisingly well in a Scope 3 setting. However, this likely represents the poor quality of Scope 3 data which inhibits more sophisticated approaches from working, rather than any particular merit to these simple techniques.  
+\\ \\
+Other papers use regression for estimating Scope 1 and Scope 2 emissions: Scope 3 is explicitly ruled out due to data quality concerns \cite{KalesnikVitali2022, GoldhammerEtAl2017}. In this context, Kalesnik and Vitali show that GHG emissions are highly persistent and so a simple autoregressive model can estimate very accurately this year's emissions \cite{KalesnikVitali2022}. Moreover, company characteristics also do a good job at predicting GHG emissions; ordinary least squares (OLS) estimation can capture over 80\% of the variation in Scope 1 and Scope 2 emissions \cite{GoldhammerEtAl2017, KalesnikVitali2022}. 
+\\ \\
+With respectable performance of regression in a Scopes 1 and 2 context, it may be hoped that regression could work in a Scope 3 setting too. Unfortunately, \cite{ManGroup2022} found that a regression of Scope 1 and 2 emissions on Scope 3 emissions yields very little explanatory power, implying that these results are unlikely to carry over. This also makes sense from a GHG Protocol point of view: the motivation behind creating Scope 3 was to capture something largely orthogonal to the company's direct emissions and energy consumption. 
+\\ \\
+Another key drawback for this more traditional statistical approach is that the estimates rely on assumptions that, if not met, will fail to provide the best, linear, and unbiased estimators. Especially important in the context of Scope 3, \cite{olesiewicz2021} show that if the data is MNAR then the OLS estimates will be biased.
+\\ \\
 
-\subsection{Forecasting Scope 3 emissions}
+\subsection{Machine learning techniques}
 
-Mind the gaps: modelling techniques applied to S1 and 2: still struggle. 
-Data coverage and modelling/literature. 
+
+
+In the Table below we summarise the main methodologies of third-party data providers to estimate GHG emissions. 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Empirical Approach}\label{sec:EmpiricalApproach}
-Several papers have argued that Scope 3 data is not yet appropriate for empirical analysis \cite{KalesnikVitali2022}. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Experimental Results}
