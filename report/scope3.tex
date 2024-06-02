@@ -253,10 +253,10 @@ Accordingly, across various datasets, S3 coverage typically exists for only arou
 	~~
 	\begin{subfigure}[t]{0.475\textwidth}
 		\centering
-		\caption{Percentage of reported Scope 3 data within YoY variation thresholds}
+		\caption{Percentage of 2021 reported S3 data within YoY variation thresholds}
 		\label{fig:Scope3Volatility}
-		\includegraphics[width=\linewidth]{data\_volatility.png}
-		\fnote{Source: FTSE-Russell \cite{ftserussell2024}, reporting entities are from the FTSE All-World constituents that disclose Scope 3 emissions}
+		\includegraphics[width=\linewidth]{s3_2021_vol.png}
+		\fnote{Source: FTSE-Russell \cite{ftserussell2024}, reporting entities are from the FTSE All-World constituents that disclose S3 emissions}
 	\end{subfigure}
 \end{figure}
 
@@ -264,7 +264,7 @@ Accordingly, across various datasets, S3 coverage typically exists for only arou
 Whereas a firm which is non-reporting is conspicuous by its absence, a more subtle problem is when a firm under-reports due to boundary incompleteness and activity exclusion. Without close scrutiny of a firm's methodology, the researcher risks assuming that the reported total Scope 3 emissions is an accurate reflection of the firm's carbon footprint, rather than a reflection of what they choose to measure and report. This problem also further degrades the data generating process; as most firms which self-report under-report their emissions, firms which benchmark themselves to peer averages also under-report as a result \cite{Hoepner2021}. Both problems of missing data (non-reporting) and biased data (under-reporting) are illustrated by Figure \ref{fig:Scope3Coverage}, which shows that most firms don't report their Scope 3 data (one minus the orange line), and for those that do, they mostly report immaterial figures (gap between orange and green line). 
 
 \subsubsection{Volatile data}
-The relative immaturity of Scope 3 reporting is reflected in the high volatility of the data (see Figure \ref{fig:Scope3Volatility}). As of 2021, over half of the disclosed values vary by over 20\% year-on-year, and over a third vary by at least 50\%. Although this is something that could improve over time as reporting practices evolve, any forecasting exercise using this past data will likely be struggle with robustness. In addition, it appears that actually the data is becoming more volatile over time. Moreover, parameter estimates are unlikely to be statistically significant due to the wide confidence intervals derived from the noisy data. 
+The relative immaturity of Scope 3 reporting is reflected in the high volatility of the data (see Figure \ref{fig:Scope3Volatility}). As of 2021, over half of the disclosed values vary by over 20\% year-on-year, and over a third vary by at least 50\%. Although this is something that could improve over time as reporting practices evolve, at the  any forecasting exercise using this past data will likely be struggle with robustness. In addition, it appears that actually the data is becoming more volatile over time. Moreover, parameter estimates are unlikely to be statistically significant due to the wide confidence intervals derived from the noisy data. 
 
 \subsubsection{Lack of consistency and comparability}
 Besides errors, revisions, and omissions that may arise from the complex task of reporting Scope 3 emissions, there are other reasons why the data may not be comparable across firms or data sources. First, despite what may appear a tightly prescriptive approach in Section \ref{sec:Scope3Reporting}, the GHG Protocol is flexible enough to provide a wide latitude in accounting and reporting methodologies. Firms must make a number of choices including their organisational boundaries, which categories to report, the calculation approach for each category, data sources, how to allocate emissions, whether to report optional extras above the minimum boundaries etc. As long as these choices can be justified according to the five accounting principles (relevance, completeness, consistency, transparency, accuracy) then they are said to conform to Scope 3 reporting standards \cite{ghgscope32013}. This methodological flexibility opens the possibility for large heterogeneity in firms' accounting and reporting their Scope 3 emissions: accordingly, firms may be consistent with respect to themselves, but aggregating them into a portfolio risks comparing apples and oranges (see Box 2 in \cite{ftserussell2024} for an illustration). 
