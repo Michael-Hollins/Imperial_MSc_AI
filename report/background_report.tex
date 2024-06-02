@@ -1,11 +1,12 @@
 \documentclass[12pt,twoside]{report}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \newcommand\fnote[1]{\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}\subcaption*{\textit{#1}}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\newcommand{\reporttitle}{Background report: XXX}
+\newcommand{\reporttitle}{Background report: estimating corporate greenhouse gas emissions}
 \newcommand{\reportauthor}{Michael David Hollins}
 \newcommand{\supervisor}{Dr Ovidiu Serban}
 \newcommand{\degreetype}{MSc AI}
@@ -15,59 +16,50 @@
 % load some definitions and default packages
 \input{includes}
 \input{notation}
-\date{September 2024}
-
+\date{June 2024}
 \begin{document}
 
 % load title page
 \input{titlepage}
-
 
 % page numbering etc.
 \pagenumbering{roman}
 \clearpage{\pagestyle{empty}\cleardoublepage}
 \setcounter{page}{1}
 \pagestyle{fancy}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%\begin{abstract}
-%Your abstract.
-%\end{abstract}
-
 \cleardoublepage
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%\section*{Acknowledgments}
-%Comment this out if not needed.
 
-\clearpage{\pagestyle{empty}\cleardoublepage}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %--- table of contents
 \fancyhead[RE,LO]{\sffamily {Table of Contents}}
 \tableofcontents 
-
-
-\clearpage{\pagestyle{empty}\cleardoublepage}
+\clearpage{\pagestyle{empty}}
 \pagenumbering{arabic}
 \setcounter{page}{1}
 \fancyhead[LE,RO]{\slshape \rightmark}
 \fancyhead[LO,RE]{\slshape \leftmark}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \chapter{Introduction}
 
 Almost every country in the world has committed to the Paris Agreement, a legally binding international treaty that aims to limit the global temperature increase above pre-industrial levels to 1.5 degrees Celsius: to achieve this, greenhouse gas (GHG) emissions must peak before 2025 and decline 43\% by 2030 \cite{unfcc2024}. Therefore, at the time of writing, we should have reached peak GHG emissions and must expect steep reductions to follow, especially in carbon dioxide which comprises most of the GHG mix \cite{Ritchie2023}. 
 \\\\
-For these ambitious targets to be achieved, firms must play a part to reduce their carbon emissions. However, focus must extend beyond direct emissions because most of the firm's carbon footprint is from the value chain \cite{ftserussell2024}. Unfortunately, while these emissions are linked to the firm's activities, as they occur outside of its operational control they cannot be measured directly. Furthermore, as the common mantra ``what gets measured gets managed'' suggests, without good quality data across the value chain, firms will be stymied in their GHG reduction efforts. 
+For these ambitious targets to be achieved, firms must play a part to reduce their carbon emissions. As ``what gets measured, gets managed'', a necessary first step is for firms to account and report their GHG emissions . Accurate GHG emissions data is vital for meeting regulatory obligations, establishing a well-functioning emissions trading market, allowing investors to hedge their transition risk and follow their preferences, and helping firms improve their efficiency by identifying opportunities for reducing waste. 
 \\\\
+Recognising the need for a common framework across jurisdictions, an alliance of businesses, governments, non-governmental organisations (NGOs), and others founded the Greenhouse Gas Protocol Initiative to develop internationally accepted GHG accounting and reporting standards for business \cite{ghgprotocol2004}. This Protocol divides emissions into three categories: Scope 1 (S1) encompasses a firm's direct emissions; Scope 2 (S2) are GHG emissions from purchased energy; and Scope 3 (S3) are all other indirect emissions from the value chain. 
+\\\\
+With the GHG Protocol steadily being adopted, over time the availability and quality of GHG emissions data has improved significantly. Nevertheless, with the standards not yet mandatory or uniformly applied in every jurisdiction, the coverage remains uneven \cite{ManGroup2022}. This raises the problem of how to estimate emissions when the data are missing. Refinitiv Eikon, the industrial partner in this project, fills the gaps using a sector median. The goal for this project is to explore what quantitative techniques can be used to improve on this baseline for estimating GHG emissions data; the priority is estimating S1 data and progressing to the other scopes if time allows.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Background}
+\chapter{Background}\label{sec:ChapterBackground}
 
-This chapter introduces the background to Scope 3 greenhouse gas (GHG) emissions reporting, standards and data. We begin with the historical and policy context in Sections \ref{sec:HistoricalContext} and \ref{sec:PolicyContext} respectively. This serves as a springboard to consider how firms are expected to report their Scope 3 emissions in Section \ref{sec:Scope3Reporting}. Next, we cover the data quality issues inherent to this reporting process in Section \ref{sec:Scope3Challenges}. Finally, we conclude by reviewing various approaches in the literature to tackling these issues for Scope 3 modelling in Section \ref{sec:Scope3Modelling}. 
+This chapter reviews some basic domain knowledge to help place the estimation and forecasting techniques in our applied context. We begin with the historical and policy background in Sections \ref{sec:HistoricalContext} and \ref{sec:PolicyContext} respectively. This serves as a springboard to review the GHG Protocol in detail in Section \ref{sec:Scope3Reporting}, which is crucial for developing an understanding of the data-generating process. Finally, in Section \ref{sec:Scope3Modelling} we conclude by reviewing how data coverage and quality has evolved. 
 
 \section{Historical context}\label{sec:HistoricalContext}
-Beginning in the 1800s, naturalists were puzzled to find signs of glacial activity in places too warm for glaciers in modern times \cite{young1995}. As the century progressed, some scientists discovered that certain gases such as carbon dioxide caused a so-called ``greenhouse effect'' in their experiments \cite{Ekholm1901}; therefore, they argued that these greenhouse gases (GHGs) might affect the planet's temperature through trapping heat in the atmosphere \cite{Arrhenius1896}, and so past climates could plausibly have been very different from our own \cite{foote1856}. Consistent with this theory, during the twentieth century, scientists observed both rising global surface temperatures and steep increases in concentrations of GHGs \cite{Sawyer1972}. Accordingly, today's mainstream scientific consensus is that the earth's recent climate change is mostly driven by human activity: as economic development has increased the combustion of fossil fuels, this has raised GHG levels in the atmosphere and thereby global temperatures \cite{IPCC2021, RS2020}. 
+Beginning in the 1800s, naturalists were puzzled to find signs of glacial activity in places too warm for ice sheets to form \cite{young1995}. Then, as the century progressed, some scientists discovered that certain gases such as carbon dioxide caused a so-called ``greenhouse effect'' in their experiments \cite{Ekholm1901}; therefore, they hypothesised that these greenhouse gases (GHGs) might affect the planet's temperature through trapping heat in the atmosphere \cite{Arrhenius1896}. Accordingly, it was plausible that past climates could have been very different from our own \cite{foote1856}. 
+\\\\
+Consistent with this theory, during the twentieth century scientists observed both rising global surface temperatures and steep increases in concentrations of GHGs \cite{Sawyer1972}. Thus, today's mainstream scientific consensus is that the earth's recent climate change is mostly driven by human activity: as economic development has increased the combustion of fossil fuels, this has raised GHG levels in the atmosphere resulting in higher global temperatures \cite{IPCC2021, RS2020}. 
 
 Accompanying the growing weight of scientific evidence was political conviction that something must be done. Consequently, landmark international treaties such as the 1997 Kyoto Protocol \cite{UN1997} and the 2015 Paris Agreement \cite{UNFCCC2020} legally mandated that countries reduce their GHG emissions. Adding to the scientific and political momentum around climate change, growing public concern for the environment further catalysed domestic support for national targets such as Net Zero \cite{Poortinga2023}. 
 
@@ -92,11 +84,11 @@ Accompanying the growing weight of scientific evidence was political conviction 
 \end{figure}
 
 \section{Policy context}\label{sec:PolicyContext}
-To meet GHG reduction targets, GHG emissions must be accurately and consistently measured. Therefore, as policy makers recognised the need for an international standard for corporate GHG accounting and reporting, in 1998, the \href{https://ghgprotocol.org/about-us}{GHG Protocol Initiative} was launched with the mission to develop GHG reporting standards for businesses \cite{ghgprotocol2004}. Since then, the GHG Protocol has increasingly been incorporated into global reporting standards including the Global Reporting Initiative (GRI 305, \cite{gri2016}), the International Financial Reporting Standards Foundation (IFRS S2, \cite{ifrs2023}) and the Taskforce on Climate-related Financial Disclosures (TCFD, \cite{tcfd2021}).
-\\ \\
+To meet GHG reduction targets, emissions must be both accurately and consistently measured, and so policy makers came together to build an international standard for corporate GHG accounting and reporting. Accordingly, in 1998 they launched the \href{https://ghgprotocol.org/about-us}{GHG Protocol Initiative} with the mission to develop GHG reporting standards for businesses \cite{ghgprotocol2004}. Since then, the GHG Protocol has been incorporated into global reporting standards including the Global Reporting Initiative (GRI 305, \cite{gri2016}), the International Financial Reporting Standards Foundation (IFRS S2, \cite{ifrs2023}) and the Taskforce on Climate-related Financial Disclosures (TCFD, \cite{tcfd2021}).
+\\\\
 Simply put, the GHG Protocol provides a framework for firms to account for their GHG emissions, which are first divided into \textit{direct} and \textit{indirect}. Direct emissions come from sources that are owned or controlled by the company. On the other hand, while indirect emissions are a consequence of activities of the company, they occur at sources owned or controlled outside the company. 
-\\ \\
-To help delineate this further, three ``scopes'' are defined for GHG accounting and reporting purposes. First,  \textbf{Scope 1} emissions are \textbf{direct} GHG emissions from sources which are owned or controlled by the company. Second, \textbf{Scope 2} emissions are the \textbf{indirect} GHG emissions from the generation of energy that is purchased, including electricity, steam, heat and cooling. Finally, \textbf{Scope 3} comprises \textbf{all other indirect emissions} that occur as a consequence of the company's activities but from sources not owned or controlled by the company. Together, these scopes encompass the total emissions footprint of a company as summarised in Figure \ref{fig:Scope3Diagram} below.
+\\\\
+To help delineate this further, three ``scopes'' are defined for GHG accounting and reporting purposes. First,  scope 1 (S1) emissions are direct emissions from sources which are owned or controlled by the company. Second, scope 2 (S2) emissions are indirect emissions from the generation of energy that is purchased, such as from electricity, steam, heat and cooling. Finally, scope 3 (S3) comprises all other indirect emissions that occur in the company's value chain. Together, these scopes encompass the total emissions footprint of a company as summarised in Figure \ref{fig:Scope3Diagram} below.
 
 \begin{figure}[H]
 	\centering
@@ -106,9 +98,9 @@ To help delineate this further, three ``scopes'' are defined for GHG accounting 
 	\fnote{Source: \cite{ghgscope32013}, p.6}
 \end{figure}
 
-In accordance with \textit{The Greenhouse Gas Protocol Corporate Accounting and Reporting Standard}, many jurisdictions require (or will soon require) mandatory Scope 1 and Scope 2 disclosures for publicly listed firms, including in the EU \cite{eu20232772}, the US \cite{sec2024}, the UK \cite{ukleg2013} and Japan \cite{fsa2022}. Furthermore, although Scope 3 reporting is currently optional in most of these key financial markets, the regulatory landscape is shifting away from voluntary efforts and towards mandatory Scope 3 disclosures \cite{ftserussell2024}. 
+In accordance with the Protocol, many jurisdictions require (or will soon require) S1 and S2 disclosures for publicly listed firms, including in the EU \cite{eu20232772}, the US \cite{sec2024}, the UK \cite{ukleg2013} and Japan \cite{fsa2022}. Furthermore, although S3 reporting is currently optional in most of these key financial markets, the regulatory landscape is shifting away from voluntary efforts and towards mandatory S3 disclosures \cite{ftserussell2024}. 
 \\ \\
-In particular, the UK is one of the most progressive jurisdictions in climate reporting. For listed companies, since 2020 the Financial Conduct Authority (FCA) has phased in mandatory Scope 3 disclosures \cite{fca2020, fca2021}. Moreover, since 2022 the government has required over 1,300 of the largest firms to disclose climate-related information, including not just traded companies but also private companies with over 500 employees and £500 million in  \cite{UK2021}. Building on this further, the UK Government's stated ambition is to introduce mandatory Scope 3 reporting across the entire economy by 2025 in line with the recommendations of the TCFD \cite{ukgov2020}. 
+To illustrate these developments, we trace how reporting requirements in the UK, one of the most progressive jurisdictions in climate reporting, have picked up over time. Beginning in 2013, listed companies were required to report their S1 and S2 emissions \cite{ukleg2013}. To bring in additional reporting requirements for listed companies, in 2018 the UK introduced the Streamlined Energy and Carbon Reporting (SECR) regime. More significantly, this legislation also brought in new requirements for large unquoted companies and limited liability partnerships to report their S1 and S2 emissions. In addition, it strongly encouraged S3 reporting from all companies, signalling the intended direction of travel. Accordingly, the UK Government's stated ambition is to introduce mandatory S3 reporting across the entire economy by 2025 in line with the recommendations of the TCFD \cite{ukgov2020}. 
 \\ \\
 \section{Scope 3 reporting} \label{sec:Scope3Reporting}
 Having set out the origins and development of GHG emission targets, it remains to consider what is required for a firm to comply with the GHG Protocol \textit{Corporate Value Chain (Scope 3) Accounting and Reporting Standard} \cite{ghgscope32013}. A detailed understanding of this process will help illuminate the issues with data quality which are covered in Section \ref{sec:Scope3Challenges}.
@@ -301,7 +293,7 @@ Another key drawback for this more traditional statistical approach is that the 
 In the Table below we summarise the main methodologies of third-party data providers to estimate GHG emissions. 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Project Plan}
+\chapter{Empirical Approaches}\label{sec:ChapterEmpiricalApproaches}
 
 %% bibliography
 \bibliographystyle{plain}
