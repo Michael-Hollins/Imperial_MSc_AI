@@ -332,11 +332,28 @@ A thorough review of the domain literature has been completed, and so I intend t
 An indicative timeline would be around one month for data cleaning/exploratory data analysis/descriptive statistics (June); one and a half months for modelling (July to mid-August); one month for the write up (mid-August to mid-September). 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Exploratory Analysis}
+\section{Data quality}
+\subsection{Relevance and completeness metrics for each category}
+
+Following the approach of Nguyen et al. \cite{Nguyenetal2023}, we specify some variables to measure the relevance and completeness of each S3 category. First, the \textbf{carbon intensity} normalises emissions by revenue. This allows us to compare emissions across firms of different sizes. Specifically:
+
+\begin{equation}
+    \mathit{Intensity}_{it}^{Cat} = \frac{\mathit{Emissions}_{it}^{Cat}}{\mathit{Revenue}_{it}}
+\end{equation}
+
+where $\mathit{Intensity}_{it}^{Cat}$, $\mathit{Emissions}_{it}^{Cat}$, and $\mathit{Revenue}_{it}$ represents the carbon intensity, S3 emissions and total revenues respectively for firm $i$ at time $t$ for S3 category $\mathit{Cat}$.
+\\\\
+Using carbon intensity measures, we can calculate the relative contribution of each category to the full composition of S3 emissions. For unreported categories where there is no data, we set the values to zero such that it provides no contribution. Therefore, the relative contribution per category is given by:
+
+\begin{equation}
+    \mathit{Contribution}_{it}^{Cat} = \frac{\mathit{Intensity}_{it}^{Cat}}{\mathit{Intensity}_{it}^{Scope3}}
+\end{equation}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Models}
 \section{Naive baselines}
 \subsection{Sector average}
-
-\subsection{Input-output model}
 
 %% bibliography
 \bibliographystyle{plain}
