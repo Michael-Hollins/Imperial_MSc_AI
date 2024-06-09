@@ -60,3 +60,5 @@ latex.out/
 
 # Report pdf
 report/*.pdf
+tb_logs/*
+*.ckpt

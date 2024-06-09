@@ -1,2 +1,10 @@
 torch==2.3.0
 transformers==4.41.0
+pypdf==4.2.0
+langchain==0.2.0
+python_dotenv==1.0.1
+langchain-huggingface==0.0.2 
+chromadb==0.5.0
+pytorch_forecasting==1.0.0
+tensorboard==2.16.2
+lightning==2.2.5
