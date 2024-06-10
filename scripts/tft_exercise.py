@@ -1,10 +1,12 @@
 # https://www.kaggle.com/code/shreyasajal/pytorch-forecasting-for-time-series-forecasting/notebook
 import pandas as pd
 import pytorch_forecasting
-from pytorch_forecasting import Baseline, TemporalFusionTransformer, TimeSeriesDataSet
+from pytorch_forecasting import TemporalFusionTransformer, TimeSeriesDataSet
 import lightning as pl
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.tuner import Tuner
+from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
+import os
 
 df_train = pd.read_csv('data/dummy_data/sales_train.csv', parse_dates=['date'])
 df_shops = pd.read_csv('data/dummy_data/shops.csv')
@@ -62,7 +64,7 @@ trainer = pl.Trainer(
     # of the gradient for recurrent neural networks
     gradient_clip_val=0.1,
     logger = logger,
-    accelerator="cpu",
+    gpus=1,
 )
 
 tft = TemporalFusionTransformer.from_dataset(
@@ -79,7 +81,6 @@ tft = TemporalFusionTransformer.from_dataset(
     # reduce learning rate if no improvement in validation loss after x epochs
     reduce_on_plateau_patience=4,
 )
-tft.save_hyperparameters(ignore=['loss', 'logging_metrics'])
 
 print(f"Number of parameters in network: {tft.size()/1e3:.1f}k")
 
@@ -96,3 +97,39 @@ lr_finder = tuner.lr_find(model = tft,
 fig = lr_finder.plot(suggest=True)
 fig.show()
 
+# Callbacks, trainer and final model
+early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=1e-7, patience=10, verbose=False, mode="min")
+lr_logger = LearningRateMonitor()  
+logger = TensorBoardLogger("lightning_logs") 
+
+trainer = pl.Trainer(
+    max_epochs=30,
+    gpus=1,
+    weights_summary="top",
+    gradient_clip_val=0.1,
+    limit_train_batches=30,  
+    callbacks=[lr_logger, early_stop_callback],
+    logger=logger,
+)
+
+
+tft = TemporalFusionTransformer.from_dataset(
+    training,
+    learning_rate=4e-6,
+    hidden_size=16,
+    attention_head_size=1,
+    dropout=0.1,
+    hidden_continuous_size=8,
+    output_size=1, 
+    loss=pytorch_forecasting.metrics.RMSE(),
+    log_interval=10,  
+    reduce_on_plateau_patience=4,
+)
+print(f"Number of parameters in network: {tft.size()/1e3:.1f}k")
+
+# Fit the model
+trainer.fit(
+    tft,
+    train_dataloader=train_dataloader,
+    val_dataloaders=val_dataloader,
+)
