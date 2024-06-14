@@ -1,7 +1,7 @@
 \documentclass[12pt,twoside]{report}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\newcommand\fnote[1]{\captionsetup{font=scriptsize, justification=raggedright, singlelinecheck=false}\subcaption*{\textit{#1}}}
+\newcommand\fnote[1]{\captionsetup{font=small, justification=raggedright, singlelinecheck=false}\subcaption*{\textit{#1}}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -334,7 +334,7 @@ An indicative timeline would be around one month for data cleaning/exploratory d
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Exploratory Analysis}
 \section{Data quality}
-\subsection{Relevance and completeness metrics for each category}
+\subsection{Relevance and completeness metrics for each category}\label{sec:RelevanceCompletenessMetrics}
 
 Following the approach of Nguyen et al. \cite{Nguyenetal2023}, we specify some variables to measure the relevance and completeness of each S3 category. First, the \textbf{carbon intensity} normalises emissions by revenue. This allows us to compare emissions across firms of different sizes. Specifically:
 
@@ -350,10 +350,102 @@ Using carbon intensity measures, we can calculate the relative contribution of e
     \mathit{Contribution}_{it}^{Cat} = \frac{\mathit{Intensity}_{it}^{Cat}}{\mathit{Intensity}_{it}^{Scope3}}
 \end{equation}
 
+Using intensity and contribution we can derive the relevance and completeness of each category. First, the \textbf{relevance} of a category is a mean of its contribution weighted by S3 intensity. This shows how important each S3 category is on average:
+
+\begin{equation}
+    \mathit{\%Relevance^{Cat}} = \frac{1}{n}*\sum_{it}{\{\mathit{\%Contribution_{it}^{Cat}}*\mathit{Intensity_{it}^{Scope3}}\}}
+\end{equation}
+
+Second, the \textbf{completeness} of each category simply returns how many firms report for that category: 
+
+\begin{equation}
+    \mathit{\%Completeness^{Cat}} = \frac{1}{n}*\sum_{it}{\{1 \  \mathit{if \  Disclosure_{it}^{Cat}}=1\}}
+\end{equation}
+
+where $\mathit{Disclosure_{it}^{Cat}}$ is a dummy variable taking the value of one if a firm reports its S3 emissions for that category in a given year. If the firm discloses ``0'', it is still counted as disclosed.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter{Models}
-\section{Naive baselines}
-\subsection{Sector average}
+\section{LSEG Baseline}
+With over half of the S3 in the global index universe unavailable, FTSE-Russell (LSEG), like all data providers, rely on estimating S3 data for the non-reporting companies. As this provides the baseline performance against which we evaluate the deep learning (DL) approaches, we cover the main aspects in detail here \cite{ftserussell2024}.
+\\\\
+First, the data is quality-controlled before being used in estimation. In particular, the extreme values are `winsorized' i.e., outliers are replaced with quantiles of the carbon intensities distribution within their respective peer group. This is performed asymmetrically, with a focus on adjusting very low values to guard against under reporting. This aligns with the `precautionary principle' emphasised in the literature \cite{Hoepner2021, olesiewicz2023} wherein firms that report abnormally low GHG emissions are by default assumed to be under-reporting.
+\\\\
+Ideally, each of the 15 S3 categories would be modelled separately, but LSEG have deemed that the data quality and coverage is insufficient. Therefore, the data points which meet basic quality controls are aggregated into upstream and downstream emissions and these upstream and downstream emissions are modelled separately. This allows for flexibility and greater detection of potential under-reporting. For example, an oil and gas firm may report credible numbers for upstream emissions, but if their downstream emissions omit the use of sold product category then their downstream numbers require adjustment. 
+\\\\
+To attenuate the drawbacks of any individual estimation technique, the final S3 estimates are produced from multiple models which are summarised in Table \ref{tab:LSEG-S3-estimation}. These models use different methods, sources of data, statistical assumptions and peer group classifications, and are grouped as either specialised or generalised. 
+\begin{table}[]
+\caption{Methods used in LSEG scope 3 estimation}
+\label{tab:LSEG-S3-estimation}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lll@{}}
+\toprule
+Type        & Model                                                                        & Description                                                                                                                                                       \\ \midrule
+Specialised & Extrapolation                                                                & \begin{tabular}[c]{@{}l@{}}Assigns carbon intensity based on the most \\ recent reported value of intensity by the company \\\\ \end{tabular}                           \\
+Specialised & \begin{tabular}[c]{@{}l@{}}Production model\\ (downstream only)\end{tabular} & \begin{tabular}[c]{@{}l@{}}Calculates Scope 3 downstream carbon emissions \\ based on fossil fuel production of companies \\\\ \end{tabular}                            \\
+Generalised & Sector median                                                                & \begin{tabular}[c]{@{}l@{}}Calculates carbon intensity based on the median \\ carbon intensity of a company’s peer-group \\\\ \end{tabular}                             \\
+Generalised & Regression model                                                             & \begin{tabular}[c]{@{}l@{}}Calculates carbon intensity based on linear \\ regression prediction using ICB classification \\ and region as regressors \\\\ \end{tabular} \\
+Generalised & \begin{tabular}[c]{@{}l@{}}Input-output model\\ (upstream only)\end{tabular} & \begin{tabular}[c]{@{}l@{}}Assigns carbon intensity based on macro-level\\ output and emissions data for each country \\ and industry\end{tabular}                \\ \bottomrule
+\end{tabular}%
+}
+\fnote{Source: Adapted from Table A in  \cite{ftserussell2024}}
+\end{table}
+\\\\
+Specialised models apply when particular conditions are met and typically yield more precise estimates. Examples include when one can simply extrapolate from a company's last reported number, or when downstream emissions can be modelled using production volumes. By contrast, generalised models only rely on data which is available for almost all companies, such as sector classification and revenue. These generalised models estimate carbon intensities based on the sector median, input-output tables or regressions. To reduce annual variation in the final estimate, where generalised models are used the estimates are based on the ‘ensemble method’, which combines the estimates generated by different generalised methods. 
+\\\\
+Final S3 emissions estimates are selected by their data quality. Reported data is preferred, followed by specialised model estimates and an ensemble of generalised models as a last resort (see Figure \ref{fig:LSEGS3Models}). 
+
+\begin{figure}[H]
+	\centering
+	\caption{LSEG scope 3 data and estimates selection hierarchy}
+	\label{fig:LSEGS3Models}
+	\includegraphics[width=\textwidth]{report/figures/LSEG_S3_flowchart.drawio.pdf}
+	\fnote{Source: Adapted from \cite{ftserussell2024}}
+\end{figure}
+
+\section{Naive approaches}
+\subsection{Industry fill model}
+
+Following the approach of Klaaßen and Stoll \cite{klassenstoll2021}, I derive the S3 category-specific carbon intensities of the peer industry group, using the median carbon intensity to control for outliers. Consistent with the notation introduced in Section \ref{sec:RelevanceCompletenessMetrics}:
+
+\begin{equation}
+    \mathit{Emission_{i\in{IND},t}}= \mathit{median}(\mathit{Intensity_{IND,t}^{Cat}})*RV_{it}
+\end{equation}
+for each industry $\mathit{IND}$ in the GICS groups. After estimating each individual category, the aggregate estimated S3 emissions for a firm are given by:
+
+\begin{equation}
+    \mathit{Emission}_{it} = \sum_{Cat}\mathit{Emission}_{i \in \mathit{IND, t}}^{Cat}
+\end{equation}
+
+\subsection{OLS model}
+
+The second naive model is a simple regression using the Ordinary Least Squares (OLS) estimator. This approach attempts to predict emissions using a linear relationship between measures of firm size and fixed-effects to control for the firm's industry group. Both emission values and the size regressors are transformed using the natural logarithm to account for the non-normality of their distributions.
+
+\begin{equation}
+    \mathit{logEmission_{it}^{Cat}}=f(\mathit{logRV_{it}}, \mathit{logEmp_{it}}, \sum_{j}\mathit{IND_{j}})
+\end{equation}
+
+where $f(.)$ is a linear function, $\mathit{logEmp_{it}}$ is the logged total employees of firm $i$ in year $t$ and $\mathit{IND}$ is a set of dummy variables for $j$ GICS groups.
+
+\section{Statistical Models}
+
+In the context of S1 and S2, a common approach to estimating emissions is to use linear regression \cite{GoldhammerEtAl2017, Griffin2017}. The theoretical motivation is that direct emissions and emissions from energy are likely to be related to a firm's production process, and so a few key financial variables such as revenue, intangible assets and leverage may model emissions well. However, S1 and S2 emissions bear little relation to emissions from the value chain, a wider set of financial metrics may be required \textcolor{red}{Insert chart}. 
+\\\\
+Therefore, as per Nguyen et al. \cite{Nguyenetal2023}, I use a wider set of financial metrics for modelling S3 emissions, specifically: revenue, total assets, number of employees, intangible assets, net property plant and equipment (NPPE), capital expense, gross margin, leverage, capital intensity, cost of goods sold (COGS), earnings before interest and taxes (EBIT), earnings before interest, taxes, depreciation and amortisation (EBITDA), operational expense, net income, total debt, current asset, current liability, inventory, and receivables. 
+\\\\
+Given the extended set of predictors and the relatively limited number of S3 observations, this could lead to multicollinearity issues. Therefore, both statistical approaches below are employed to mitigate this issue.
+
+\subsection{Stepwise linear regression}
+
+A stepwise linear regression automatically selects which variables to include in the model. Relevant variables are determined automatically with a threshold of inclusion at a significance level of $<1\%$ and exclusion at $>5\%$. The stepwise nature of the algorithm ensures that how the variables relate to each other is considered at every step, not just individual significance. 
+
+\subsection{Elastic Net}
+
+Another method to ameliorate multicollinearity is to use an elastic net which is a penalised regression model. This approach combines the penalty terms from the ridge and LASSO regressions making it especially good at dealing with correlated variables. 
+
+\section{Assessment}
+
+There are several measures that can be used to compare models. The $R^{2}$ might lead to overfitting because it purely focuses on in-sample model performance. Therefore, to best predict emissions out of sample, we use the $MAE$ etc.
 
 %% bibliography
 \bibliographystyle{plain}
