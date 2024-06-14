@@ -62,3 +62,6 @@ latex.out/
 report/*.pdf
 tb_logs/*
 *.ckpt
+
+# Ignore data
+data/
