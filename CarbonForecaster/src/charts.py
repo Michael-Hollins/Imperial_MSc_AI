@@ -2,7 +2,7 @@ import pandas as pd
 import os
 import seaborn as sns
 import matplotlib.pyplot as plt
-from utilities import plot_remove_labels
+from scripts.custom_functions import plot_remove_labels
 
 # Set parameters
 sns.set_style("whitegrid")
