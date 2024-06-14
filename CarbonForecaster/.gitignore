@@ -7,7 +7,7 @@ __pycache__/
 *$py.class
 
 # Python Virtual Environments
-thesis_venv/
+venv/
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
@@ -64,4 +64,4 @@ tb_logs/*
 *.ckpt
 
 # Ignore data
-data/
+../data/
