@@ -65,3 +65,7 @@ tb_logs/*
 
 # Ignore data
 ../data/
+
+# Package build
+src/CarbonForecaster*
+CarbonForecaster*
