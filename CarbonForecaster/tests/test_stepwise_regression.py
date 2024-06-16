@@ -1,5 +1,5 @@
 import pytest 
-from scripts.custom_functions import forward_step
+from src.custom_functions import forward_step
 
 
 # this block is only executed when you run the file directly as `python this_script.py`
