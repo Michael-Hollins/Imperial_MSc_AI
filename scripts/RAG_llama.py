@@ -1,1 +1,0 @@
-from llama_index import VectorStoreIndex, SimpleDirectoryReader
