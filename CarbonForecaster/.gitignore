@@ -5,6 +5,7 @@ primary_sources/
 __pycache__/
 *.py[cod]
 *$py.class
+*.pytest_cache
 
 # Python Virtual Environments
 .venv/
@@ -66,6 +67,10 @@ tb_logs/*
 # Ignore data
 ../data/
 
+# Ignore logs
+lightning_logs/
+
 # Package build
 src/CarbonForecaster*
 CarbonForecaster*
+dist
