@@ -65,7 +65,7 @@ tb_logs/*
 *.ckpt
 
 # Ignore data
-../data/
+data/
 
 # Ignore logs
 lightning_logs/

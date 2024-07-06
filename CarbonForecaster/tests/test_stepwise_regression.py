@@ -1,5 +1,5 @@
 import pytest 
-from src.custom_functions import forward_step
+from utilities import forward_step
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm

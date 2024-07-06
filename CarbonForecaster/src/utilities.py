@@ -1,12 +1,15 @@
 import pandas as pd
 import statsmodels.api as sm
 import copy
+import refinitiv.data as rd
 
+# Plotting
 def plot_remove_labels(plot):
     plot.set_xlabel("")
     plot.set_ylabel("")
     plot.set_title("")
-    
+
+# Stepwise regression    
 def forward_step(y, X, included_features, inclusion_threshold, verbose):
     """
     Perform a forward step in stepwise regression by adding the most significant feature.
