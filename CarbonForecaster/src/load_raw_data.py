@@ -1,120 +1,16 @@
-# Load in the raw data from Refinitiv
 import refinitiv.data as rd
 import pandas as pd
 import re
-rd.open_session()
+import logging
+import warnings
 
-def reshape_historic_data(df):
-    """
-    Reshapes a DataFrame containing historic data from wide format to long format,
-    and then pivots it to have metrics as separate columns.
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)  # Suppress httpx INFO messages
 
-    Args:
-        df (pandas.DataFrame): The input DataFrame containing historical data. It can have a single-level
-                               or multi-level column index. If it has a multi-level column index, the first
-                               level represents the instruments and the second level represents the metrics.
-                               The 'Date' column should be present as well.
-
-    Returns:
-        pandas.DataFrame: A reshaped DataFrame where each row corresponds to a unique combination of
-                          Date and Instrument. If the input DataFrame has multiple metrics, each metric
-                          is a separate column. If there is only one metric, it will be in a column named
-                          after the original column name.
-
-    Example:
-        Given a DataFrame 'df' with the following structure:
-        
-            Date        Instrument1          Instrument2          ...
-                        Metric1  Metric2     Metric1  Metric2     ...
-            2014-12-31  ...      ...         ...      ...         ...
-            2015-12-31  ...      ...         ...      ...         ...
-            ...
-
-        The function returns a DataFrame with the following structure:
-        
-            Date        Instrument  Metric1  Metric2  ...
-            2014-12-31  ...         ...      ...      ...
-            2015-12-31  ...         ...      ...      ...
-            ...
-    """
-    if df.columns.nlevels == 1:
-        col_name = df.columns.name
-        df = df.reset_index().melt(id_vars=['Date'], var_name=['Instrument'], value_name=col_name)
-    elif df.columns.nlevels > 1:
-        df = df.reset_index().melt(id_vars=['Date'], var_name=['Instrument', 'Metric'])
-        df = df.pivot_table(index=['Date', 'Instrument'], columns = 'Metric', values='value', aggfunc=lambda x: x).reset_index()
-    df.columns.name = None
-    return df
-
-def load_historical_data(universe, fields, interval, start_date, end_date):
-    """
-    Loads and reshapes historical data for a given set of instruments and fields over a specified date range.
-
-    Args:
-        universe (list): List of instruments for which the historical data is to be fetched.
-        fields (dict): Dictionary where keys are field types (e.g., 'co2e', 'price', etc.) and values are lists of field names to fetch.
-        interval (str): Time interval for the data (e.g., 'daily', 'monthly', 'yearly').
-        start_date (str): The start date for the data range in 'YYYY-MM-DD' format.
-        end_date (str): The end date for the data range in 'YYYY-MM-DD' format.
-
-    Returns:
-        pandas.DataFrame: A DataFrame containing the reshaped historical data for the specified instruments and fields, merged on 'Date' and 'Instrument'.
-
-    Example:
-        universe = ['XOM', 'CVX']
-        fields = {'price': ['CLOSE_CF', 'OPEN_PRC'], 'co2e': ['TR.CO2DirectScope1']}
-        interval = 'yearly'
-        start_date = '2020-01-01'
-        end_date = '2022-12-31'
-
-        df = load_historical_data(universe, fields, interval, start_date, end_date)
-    """
-    df = None
-    historic_field_types = [i for i in fields if i != 'static']
-    
-    for historic_set in historic_field_types:
-        data = rd.get_history(universe=universe, fields=fields[historic_set], interval=interval, start=start_date, end=end_date)
-        data = reshape_historic_data(data)
-        if df is None:
-            df = data
-        else:
-            df = df.merge(data, on=['Date', 'Instrument'], how='outer')
-    
-    return df
-
-def coerce_dtypes(df, numeric_cols, string_cols):
-    """
-    Coerces specified columns in a pd.DataFrame to numeric or stringformat.
-
-    Args:
-        df (pandas.DataFrame): The input DataFrame
-        numeric_cols (list): List of column names and regex patterns for columns to be coerced.
-        string_cols (list): List of column names and regex patterns for columns to be coerced.
-        
-    Returns:
-        pandas.DataFrame: The DataFrame with specified columns coerced.
-    """
-    def is_numeric_col(column):
-        for pattern in numeric_cols:
-            if isinstance(pattern, str) and column == pattern:
-                return True
-            elif isinstance(pattern, re.Pattern) and pattern.search(column):
-                return True
-        return False
-    
-    def is_string_col(column):
-        for pattern in string_cols:
-            if isinstance(pattern, str) and column == pattern:
-                return True
-            elif isinstance(pattern, re.Pattern) and pattern.search(column):
-                return True
-        return False
-    
-    numeric_columns = [col for col in df.columns if is_numeric_col(col)]
-    string_columns = [col for col in df.columns if is_string_col(col)]
-    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
-    df[string_columns] = df[string_columns].astype(str)
-    return df
+# Suppress specific warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="pandas.core.dtypes.cast")
 
 fields = {
     'static':[
@@ -192,21 +88,196 @@ col_mapping = {
     'Downstream scope 3 emissions Investments': 's3_investments_cat15'   
 }
 
+numeric_cols = [re.compile(r"_code$"), "revenue", "employees", "mcap", re.compile(r"_co2e$"), re.compile(r"^s3")]
+string_cols = ['instrument', 'co2e_method']
 
-# Constants
-LARGEST_MINING_COMPANIES=['2222.SE', 'XOM', 'CVX', 'SHEL.L', '601857.SS', 'TTEF.PA', 'GAZP.MM', 'COP', 'BP.L', 'ROSN.MM']
-INTERVAL='1Y'
-START_DATE='2015-01-01'
-END_DATE='2024-01-01'
+def is_string_or_single_item_list(obj):
+    """
+    Checks if the given object is a string or a list with a single item.
+
+    Args:
+        obj: The object to check.
+
+    Returns:
+        bool: True if the object is a string or a list with a single item, False otherwise.
+    """
+    return isinstance(obj, str) or (isinstance(obj, list) and len(obj) == 1)
 
 
-static_data = rd.get_data(universe=LARGEST_MINING_COMPANIES, fields = fields['static'])    
-historic_data = load_historical_data(universe=LARGEST_MINING_COMPANIES, fields=fields, interval=INTERVAL, start_date=START_DATE, end_date=END_DATE)
-data = static_data.merge(historic_data, how='outer', on='Instrument')
-data.rename(columns=col_mapping, inplace=True)
-data = data[col_mapping.values()]
-#numeric_cols = [re.compile(r"_code$"), "revenue", "employees", "mcap", re.compile(r"_co2e$"), re.compile(r"^s3")]
-#string_cols = ['instrument', 'co2e_method']
-#data = coerce_dtypes(data, numeric_cols, string_cols)
+def load_one_firm(universe, fields, interval, start_date, end_date):
+    """
+    Loads historical data for a single firm.
 
-rd.close_session()
+    Args:
+        universe (list or str): The instrument or list containing one instrument.
+        fields (list or str): List of fields to fetch.
+        interval (str): Time interval for the data (e.g., 'daily', 'monthly', 'yearly').
+        start_date (str): The start date for the data range in 'YYYY-MM-DD' format.
+        end_date (str): The end date for the data range in 'YYYY-MM-DD' format.
+
+    Returns:
+        pandas.DataFrame: A DataFrame with the historical data for the single firm.
+    """
+    df = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date).reset_index()
+    df['Instrument'] = df.columns.name
+    df.columns.name = None
+    return df
+
+
+def load_one_field(universe, fields, interval, start_date, end_date):
+    """
+    Loads historical data for multiple firms but a single field.
+
+    Args:
+        universe (list): List of instruments for which the historical data is to be fetched.
+        fields (list or str): A single field to fetch.
+        interval (str): Time interval for the data (e.g., 'daily', 'monthly', 'yearly').
+        start_date (str): The start date for the data range in 'YYYY-MM-DD' format.
+        end_date (str): The end date for the data range in 'YYYY-MM-DD' format.
+
+    Returns:
+        pandas.DataFrame: A DataFrame with the historical data for the single field across multiple firms.
+    """
+    df = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date).reset_index()
+    df = df.melt(id_vars='Date', var_name='Instrument', value_name=df.columns.name)
+    df.columns.name = None
+    return df
+
+
+def load_multiple_firms_and_fields(df):
+    """
+    Reshapes a DataFrame containing historical data from wide format to long format and pivots it to have metrics as separate columns.
+
+    Args:
+        df (pandas.DataFrame): The input DataFrame containing historical data.
+
+    Returns:
+        pandas.DataFrame: A reshaped DataFrame where each row corresponds to a unique combination of Date and Instrument.
+    """
+    df = df.reset_index().melt(id_vars=['Date'], var_name=['Instrument', 'Metric'])
+    df = df.pivot_table(index=['Date', 'Instrument'], columns='Metric', values='value', aggfunc=lambda x: x).reset_index()
+    df.columns.name = None
+    return df
+
+def load_historical_data(universe, fields, interval, start_date, end_date):
+    """
+    Loads and reshapes historical data for a given set of instruments and fields over a specified date range.
+
+    Args:
+        universe (list or str): List of instruments or a single instrument for which the historical data is to be fetched.
+        fields (dict or list): Dictionary of field types and their respective field names, or a list of field names.
+        interval (str): Time interval for the data (e.g., 'daily', 'monthly', 'yearly').
+        start_date (str): The start date for the data range in 'YYYY-MM-DD' format.
+        end_date (str): The end date for the data range in 'YYYY-MM-DD' format.
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the reshaped historical data for the specified instruments and fields.
+    """
+    if is_string_or_single_item_list(universe):
+        return load_one_firm(universe, fields, interval, start_date, end_date)
+    
+    if is_string_or_single_item_list(fields):
+        return load_one_field(universe, fields, interval, start_date, end_date)
+    
+    df = None
+    
+    if isinstance(fields, dict):
+        historic_field_types = [field_type for field_type in fields if field_type != 'static']
+        
+        for historic_set in historic_field_types:
+            try:
+                data = rd.get_history(universe=universe, fields=fields[historic_set], interval=interval, start=start_date, end=end_date)
+                data = load_multiple_firms_and_fields(data)
+                if df is None:
+                    df = data
+                else:
+                    df = df.merge(data, on=['Date', 'Instrument'], how='outer')
+            except Exception as e:
+                logger.error(f"An error occurred while fetching historical data for {historic_set}: {e}")
+    else:
+        # Handle case where fields is a list
+        try:
+            data = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date)
+            data = load_multiple_firms_and_fields(data)
+            df = data
+        except Exception as e:
+            logger.error(f"An error occurred while fetching historical data: {e}")
+    
+    return df
+
+def coerce_dtypes(df, numeric_cols=numeric_cols, string_cols=string_cols):
+    """
+    Coerces specified columns in a DataFrame to numeric or string format.
+
+    Args:
+        df (pandas.DataFrame): The input DataFrame.
+        numeric_cols (list): List of column names and regex patterns for columns to be coerced to numeric.
+        string_cols (list): List of column names and regex patterns for columns to be coerced to string.
+
+    Returns:
+        pandas.DataFrame: The DataFrame with specified columns coerced.
+    """
+    def is_numeric_col(column):
+        for pattern in numeric_cols:
+            if isinstance(pattern, str) and column == pattern:
+                return True
+            elif isinstance(pattern, re.Pattern) and pattern.search(column):
+                return True
+        return False
+    
+    def is_string_col(column):
+        for pattern in string_cols:
+            if isinstance(pattern, str) and column == pattern:
+                return True
+            elif isinstance(pattern, re.Pattern) and pattern.search(column):
+                return True
+        return False
+    
+    numeric_columns = [col for col in df.columns if is_numeric_col(col)]
+    string_columns = [col for col in df.columns if is_string_col(col)]
+    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+    df[string_columns] = df[string_columns].astype(str)
+    return df
+
+def rename_columns(data, col_mapping=col_mapping):
+    """
+    Renames columns according to a column mapping dictionary and reorders them.
+
+    Args:
+        data (pandas.DataFrame): The input DataFrame.
+        col_mapping (dict): Dictionary of old column names as keys and new column names as values.
+
+    Returns:
+        pandas.DataFrame: The DataFrame with columns renamed and reordered.
+    """
+    data.rename(columns=col_mapping, inplace=True)
+    data = data[col_mapping.values()]
+    return data
+
+def load_all(universe, fields=fields, interval='yearly', start_date='2019-01-01', end_date='2020-01-01'):
+    """
+    Combines static and historical data loading functions to return the complete dataset in a single call.
+
+    Args:
+        universe (list or str): List of instruments or a single instrument for which the data is to be fetched.
+        fields (dict): Dictionary of field types and their respective field names.
+        interval (str): Time interval for the data (e.g., 'daily', 'monthly', 'yearly').
+        start_date (str): The start date for the data range in 'YYYY-MM-DD' format.
+        end_date (str): The end date for the data range in 'YYYY-MM-DD' format.
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the complete data for the specified instruments and fields.
+    """
+    try:
+        rd.open_session()
+        static_data = rd.get_data(universe=universe, fields=fields['static'])
+        historic_data = load_historical_data(universe=universe, fields=fields, interval=interval, start_date=start_date, end_date=end_date)
+        data = static_data.merge(historic_data, how='outer', on='Instrument')
+        data = rename_columns(data)
+        data = coerce_dtypes(data)
+        rd.close_session()
+    except Exception as e:
+        logger.error(f"An error occurred while loading data: {e}")
+        rd.close_session()
+        return None
+    return data

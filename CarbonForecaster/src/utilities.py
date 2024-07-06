@@ -1,7 +1,6 @@
 import pandas as pd
 import statsmodels.api as sm
 import copy
-import refinitiv.data as rd
 
 # Plotting
 def plot_remove_labels(plot):
