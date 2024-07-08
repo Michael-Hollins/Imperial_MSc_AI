@@ -27,7 +27,6 @@ class TestForwardStep:
 
         new_features = forward_step(y, X, included_features, inclusion_threshold, verbose)
         
-        candidate_features = set(X.columns) - included_features
         expanded_features = list(included_features) + list(new_features)
         model = sm.OLS(y, sm.add_constant(X[expanded_features])).fit()
         p_values = model.pvalues

@@ -1,5 +1,4 @@
 from sklearn.datasets import fetch_california_housing
-from utilities import stepwise_selection
 import pandas as pd
 import statsmodels.api as sm
 import copy

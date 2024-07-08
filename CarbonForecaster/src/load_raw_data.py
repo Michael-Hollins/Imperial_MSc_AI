@@ -93,7 +93,7 @@ string_cols = ['instrument', 'co2e_method']
 
 def is_string_or_single_item_list(obj):
     """
-    Checks if the given object is a string or a list with a single item.
+    Checks if the given object is a string or a list with a single string item.
 
     Args:
         obj: The object to check.
@@ -101,7 +101,7 @@ def is_string_or_single_item_list(obj):
     Returns:
         bool: True if the object is a string or a list with a single item, False otherwise.
     """
-    return isinstance(obj, str) or (isinstance(obj, list) and len(obj) == 1)
+    return isinstance(obj, str) or (isinstance(obj, list) and len(obj) == 1 and isinstance(obj[0], str))
 
 
 def load_one_firm(universe, fields, interval, start_date, end_date):
@@ -118,9 +118,11 @@ def load_one_firm(universe, fields, interval, start_date, end_date):
     Returns:
         pandas.DataFrame: A DataFrame with the historical data for the single firm.
     """
+    rd.open_session()
     df = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date).reset_index()
     df['Instrument'] = df.columns.name
     df.columns.name = None
+    rd.close_session()
     return df
 
 
@@ -138,13 +140,15 @@ def load_one_field(universe, fields, interval, start_date, end_date):
     Returns:
         pandas.DataFrame: A DataFrame with the historical data for the single field across multiple firms.
     """
+    rd.open_session()
     df = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date).reset_index()
     df = df.melt(id_vars='Date', var_name='Instrument', value_name=df.columns.name)
     df.columns.name = None
+    rd.close_session()
     return df
 
 
-def load_multiple_firms_and_fields(df):
+def reshape_multiple_firms_and_fields(df):
     """
     Reshapes a DataFrame containing historical data from wide format to long format and pivots it to have metrics as separate columns.
 
@@ -180,14 +184,14 @@ def load_historical_data(universe, fields, interval, start_date, end_date):
         return load_one_field(universe, fields, interval, start_date, end_date)
     
     df = None
-    
+    rd.open_session()
     if isinstance(fields, dict):
         historic_field_types = [field_type for field_type in fields if field_type != 'static']
         
         for historic_set in historic_field_types:
             try:
                 data = rd.get_history(universe=universe, fields=fields[historic_set], interval=interval, start=start_date, end=end_date)
-                data = load_multiple_firms_and_fields(data)
+                data = reshape_multiple_firms_and_fields(data)
                 if df is None:
                     df = data
                 else:
@@ -198,11 +202,11 @@ def load_historical_data(universe, fields, interval, start_date, end_date):
         # Handle case where fields is a list
         try:
             data = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date)
-            data = load_multiple_firms_and_fields(data)
+            data = reshape_multiple_firms_and_fields(data)
             df = data
         except Exception as e:
             logger.error(f"An error occurred while fetching historical data: {e}")
-    
+    rd.close_session()
     return df
 
 def coerce_dtypes(df, numeric_cols=numeric_cols, string_cols=string_cols):
