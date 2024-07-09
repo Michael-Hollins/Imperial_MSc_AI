@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import logging
 import warnings
+import pickle
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -23,9 +24,10 @@ fields = {
         'TR.TRBCActivityCode'
         ],
     'size':[
-        'TR.F.TotRevenue', 
-        'TR.F.EmpFTEEquivPrdEnd',
-        'TR.F.MktCap'
+        'TR.F.TotRevenue',
+        'TR.F.EV', 
+        #'TR.F.EmpFTEEquivPrdEnd',
+        #'TR.F.MktCap'
         ],
     'co2e':[
         'TR.CO2DirectScope1',
@@ -65,8 +67,9 @@ col_mapping = {
     'TRBC Activity Code': 'activity_code',
     'Date': 'date_val',
     'Revenue from Business Activities - Total': 'revenue',
-    'Employees - Full-Time/Full-Time Equivalents - Period End': 'employees',
-    'Market Capitalization': 'mcap',
+    'Enterprise Value' :'ev',
+    #'Employees - Full-Time/Full-Time Equivalents - Period End': 'employees',
+    #'Market Capitalization': 'mcap',
     'CO2 Equivalent Emissions Direct, Scope 1': 's1_co2e',
     'CO2 Equivalent Emissions Indirect, Scope 2': 's2_co2e',
     'CO2 Equivalent Emissions Indirect, Scope 3': 's3_co2e',
@@ -88,7 +91,7 @@ col_mapping = {
     'Downstream scope 3 emissions Investments': 's3_investments_cat15'   
 }
 
-numeric_cols = [re.compile(r"_code$"), "revenue", "employees", "mcap", re.compile(r"_co2e$"), re.compile(r"^s3")]
+numeric_cols = [re.compile(r"_code$"), "revenue", "ev", "employees", "mcap", re.compile(r"_co2e$"), re.compile(r"^s3")]
 string_cols = ['instrument', 'co2e_method']
 
 def is_string_or_single_item_list(obj):
@@ -118,11 +121,27 @@ def load_one_firm(universe, fields, interval, start_date, end_date):
     Returns:
         pandas.DataFrame: A DataFrame with the historical data for the single firm.
     """
-    rd.open_session()
-    df = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date).reset_index()
-    df['Instrument'] = df.columns.name
-    df.columns.name = None
-    rd.close_session()
+    df = None
+    
+    if isinstance(fields, dict):
+        historic_field_types = [field_type for field_type in fields if field_type != 'static']
+        
+        for historic_set in historic_field_types:
+            try:
+                data = rd.get_history(universe=universe, fields=fields[historic_set], interval=interval, start=start_date, end=end_date).reset_index()
+                data['Instrument'] = data.columns.name
+                data.columns.name = None
+                if df is None:
+                    df = data
+                else:
+                    df = df.merge(data, on=['Date', 'Instrument'], how='outer')
+            except Exception as e:
+                logger.error(f"An error occurred while fetching historical data for {historic_set}: {e}")
+    else:
+        df = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date).reset_index()
+        df['Instrument'] = df.columns.name
+        df.columns.name = None
+
     return df
 
 
@@ -140,11 +159,27 @@ def load_one_field(universe, fields, interval, start_date, end_date):
     Returns:
         pandas.DataFrame: A DataFrame with the historical data for the single field across multiple firms.
     """
-    rd.open_session()
-    df = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date).reset_index()
-    df = df.melt(id_vars='Date', var_name='Instrument', value_name=df.columns.name)
-    df.columns.name = None
-    rd.close_session()
+    df = None
+
+    if isinstance(fields, dict):
+        historic_field_types = [field_type for field_type in fields if field_type != 'static']
+
+        for historic_set in historic_field_types:
+            try:
+                data = rd.get_history(universe=universe, fields=fields[historic_set], interval=interval, start=start_date, end=end_date).reset_index()
+                data = data.melt(id_vars='Date', var_name='Instrument', value_name=data.columns.name)
+                data.columns.name = None
+                if df is None:
+                    df = data
+                else:
+                    df = df.merge(data, on=['Date', 'Instrument'], how='outer')
+            except Exception as e:
+                logger.error(f"An error occurred while fetching historical data for {historic_set}: {e}")
+    else:
+        df = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date).reset_index()
+        df = df.melt(id_vars='Date', var_name='Instrument', value_name=df.columns.name)
+        df.columns.name = None
+
     return df
 
 
@@ -184,10 +219,10 @@ def load_historical_data(universe, fields, interval, start_date, end_date):
         return load_one_field(universe, fields, interval, start_date, end_date)
     
     df = None
-    rd.open_session()
+
     if isinstance(fields, dict):
         historic_field_types = [field_type for field_type in fields if field_type != 'static']
-        
+
         for historic_set in historic_field_types:
             try:
                 data = rd.get_history(universe=universe, fields=fields[historic_set], interval=interval, start=start_date, end=end_date)
@@ -198,16 +233,9 @@ def load_historical_data(universe, fields, interval, start_date, end_date):
                     df = df.merge(data, on=['Date', 'Instrument'], how='outer')
             except Exception as e:
                 logger.error(f"An error occurred while fetching historical data for {historic_set}: {e}")
-    else:
-        # Handle case where fields is a list
-        try:
-            data = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date)
-            data = reshape_multiple_firms_and_fields(data)
-            df = data
-        except Exception as e:
-            logger.error(f"An error occurred while fetching historical data: {e}")
-    rd.close_session()
+    
     return df
+
 
 def coerce_dtypes(df, numeric_cols=numeric_cols, string_cols=string_cols):
     """
@@ -279,9 +307,60 @@ def load_all(universe, fields=fields, interval='yearly', start_date='2019-01-01'
         data = static_data.merge(historic_data, how='outer', on='Instrument')
         data = rename_columns(data)
         data = coerce_dtypes(data)
-        rd.close_session()
     except Exception as e:
         logger.error(f"An error occurred while loading data: {e}")
-        rd.close_session()
-        return None
+        data = None
+    finally:
+         rd.close_session()
     return data
+
+
+def chunk_list(lst, chunk_size):
+    """
+    Splits the input list into chunks of the specified size
+
+    Args:
+        lst (list): The full list to be split
+        chunk_size (int): The size of each chunk
+        
+    Output:
+        list: The next chunk of the input list
+    """
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
+
+
+def get_mock_universe():
+    """ Quick script to pull in a selection of firms from Refinitiv"""
+    eu_growth = pd.read_excel('data/mock_universe/eu_large_growth_loans_12M.xlsx', usecols=['Issuer/Borrower PermID', 'Issuer/Borrower Name Full'])
+    eu_value = pd.read_excel('data/mock_universe/eu_large_value_loans_12M.xlsx', usecols=['Issuer/Borrower PermID', 'Issuer/Borrower Name Full'])
+    us_firms = pd.read_excel('data/mock_universe/us_firms_loans_12M.xlsx', usecols=['Issuer/Borrower PermID', 'Issuer/Borrower Name Full'])
+    data = pd.concat([eu_growth, eu_value, us_firms])
+    data.columns = ['permID', 'name']
+    data['permID'] = pd.to_numeric(data['permID'], errors='coerce')
+    data.dropna(inplace=True)
+    data['permID'] = data['permID'].astype('Int64').astype(str)
+    data = data['permID'].drop_duplicates().tolist()
+    # bad_IDs = ['5000806590', '4295906670', '4296664080']
+    # data = [x for x in data if x not in bad_IDs]
+    return data
+
+# Constants
+#LARGEST_MINING_COMPANIES=['2222.SE', 'XOM', 'CVX', 'SHEL.L', '601857.SS', 'TTEF.PA', 'GAZP.MM', 'COP', 'BP.L', 'ROSN.MM']
+
+def save_mock_universe():
+    MOCK_UNIVERSE = get_mock_universe()
+    INTERVAL = '1Y'
+    START_DATE = '2019-01-01'
+    END_DATE = '2022-01-01'
+    CHUNK_SIZE = 10
+
+    data = pd.DataFrame()
+    chunk_num = 1
+    for chunk in chunk_list(MOCK_UNIVERSE , CHUNK_SIZE):
+        chunk_data = load_all(chunk, interval=INTERVAL, start_date=START_DATE, end_date=END_DATE)
+        data = pd.concat([data, chunk_data], ignore_index=True)
+        print(f'Successfully loaded chunk number {chunk_num}')
+        chunk_num += 1
+
+    data.to_pickle('data/mock_universe/mock_universe.pkl')
