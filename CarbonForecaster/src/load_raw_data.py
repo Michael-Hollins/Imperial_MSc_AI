@@ -185,16 +185,19 @@ def load_one_field(universe, fields, interval, start_date, end_date):
 
 def reshape_multiple_firms_and_fields(df):
     """
-    Reshapes a DataFrame containing historical data from wide format to long format and pivots it to have metrics as separate columns.
+    Reshapes a DataFrame containing historical data from long format to wide format by pivoting it so that each metric becomes a separate column. 
+    It ensures that for each combination of Date and Instrument, the non-missing value is retained, or if both are missing, the first occurrence is kept.
 
     Args:
-        df (pandas.DataFrame): The input DataFrame containing historical data.
+        df (pandas.DataFrame): The input DataFrame containing historical data in long format with columns 'Date', 'Instrument', 'Metric', and 'value'.
 
     Returns:
-        pandas.DataFrame: A reshaped DataFrame where each row corresponds to a unique combination of Date and Instrument.
+        pandas.DataFrame: A reshaped DataFrame where each row corresponds to a unique combination of Date and Instrument, and each metric is a separate column.
     """
     df = df.reset_index().melt(id_vars=['Date'], var_name=['Instrument', 'Metric'])
-    df = df.pivot_table(index=['Date', 'Instrument'], columns='Metric', values='value', aggfunc=lambda x: x).reset_index()
+    df = df.sort_values(by=['Date', 'Instrument', 'Metric', 'value'], na_position='last')
+    df = df.drop_duplicates(subset=['Date', 'Instrument', 'Metric'], keep='first')
+    df = df.pivot(index=['Date', 'Instrument'], columns='Metric', values='value').reset_index()
     df.columns.name = None
     return df
 
@@ -351,8 +354,8 @@ def get_mock_universe():
 def save_mock_universe():
     MOCK_UNIVERSE = get_mock_universe()
     INTERVAL = '1Y'
-    START_DATE = '2019-01-01'
-    END_DATE = '2022-01-01'
+    START_DATE = '2015-01-01'
+    END_DATE = '2024-01-01'
     CHUNK_SIZE = 10
 
     data = pd.DataFrame()
@@ -364,3 +367,6 @@ def save_mock_universe():
         chunk_num += 1
 
     data.to_pickle('data/mock_universe/mock_universe.pkl')
+    
+if __name__=="__main__":
+    save_mock_universe()
