@@ -23,11 +23,29 @@ fields = {
         'TR.TRBCIndustryCode',
         'TR.TRBCActivityCode'
         ],
-    'size':[
-        'TR.F.TotRevenue',
+    'business_metrics':[
         'TR.F.EV', 
-        #'TR.F.EmpFTEEquivPrdEnd',
-        #'TR.F.MktCap'
+        'TR.F.MktCap',
+        'TR.F.TotRevenue',
+        'TR.F.EBIT',
+        'TR.F.EmpFTEEquivPrdEnd',
+        'TR.F.NetCashFlowOp',
+        'TR.F.PPENetTot',
+        'TR.COGSActValue',
+        'TR.F.CAPEXTot',
+        'TR.F.IntangTotNet',
+        'TR.F.LTDebtExclCapLease',
+        ],
+    'industry_production':[
+        'TR.F.CrudeOilProdTot',
+        'TR.F.GasLiquidsProdTot',
+        'TR.F.NatGasProdTot',
+        'TR.WasteTotal',
+    ],
+    'emissions':[
+        'TR.PolicyEmissionsScore',
+        'TR.TargetEmissionsScore',
+        'TR.EmissionsTradingScore',
         ],
     'co2e':[
         'TR.CO2DirectScope1',
@@ -68,8 +86,21 @@ col_mapping = {
     'Date': 'date_val',
     'Revenue from Business Activities - Total': 'revenue',
     'Enterprise Value' :'ev',
-    #'Employees - Full-Time/Full-Time Equivalents - Period End': 'employees',
-    #'Market Capitalization': 'mcap',
+    'Employees - Full-Time/Full-Time Equivalents - Period End': 'employees',
+    'Market Capitalization': 'mcap',
+    'Earnings before Interest & Taxes (EBIT)': 'ebit',
+    'Net Cash Flow from Operating Activities': 'net_cash_flow',
+    'Property Plant & Equipment - Net - Total': 'net_ppe',
+    'Cost Of Goods Sold - Actual': 'cogs',
+    'Intangible Assets - Total - Net': 'intangible_assets',
+    'Long-Term Debt excluding Capitalized Leases': 'lt_debt',
+    'Crude Oil - Production - Total': 'prod_crude_oil',
+    'Gas Liquids (NGL) - Production - Total': 'prod_natural_gas_liquids',
+    'Natural Gas - Production - Total': 'prod_nat_gas',
+    'Waste Total': 'waste',
+    'Policy Emissions Score': 'policy_emissions_score',
+    'Targets Emissions Score': 'target_emissions_score',
+    'Emissions Trading Score': 'emissions_trading_score',
     'CO2 Equivalent Emissions Direct, Scope 1': 's1_co2e',
     'CO2 Equivalent Emissions Indirect, Scope 2': 's2_co2e',
     'CO2 Equivalent Emissions Indirect, Scope 3': 's3_co2e',
@@ -194,12 +225,16 @@ def reshape_multiple_firms_and_fields(df):
     Returns:
         pandas.DataFrame: A reshaped DataFrame where each row corresponds to a unique combination of Date and Instrument, and each metric is a separate column.
     """
-    df = df.reset_index().melt(id_vars=['Date'], var_name=['Instrument', 'Metric'])
-    df = df.sort_values(by=['Date', 'Instrument', 'Metric', 'value'], na_position='last')
-    df = df.drop_duplicates(subset=['Date', 'Instrument', 'Metric'], keep='first')
-    df = df.pivot(index=['Date', 'Instrument'], columns='Metric', values='value').reset_index()
-    df.columns.name = None
-    return df
+    try:
+        df = df.reset_index().melt(id_vars=['Date'], var_name=['Instrument', 'Metric'])
+        df = df.sort_values(by=['Date', 'Instrument', 'Metric', 'value'], na_position='last')
+        df = df.drop_duplicates(subset=['Date', 'Instrument', 'Metric'], keep='first')
+        df = df.pivot(index=['Date', 'Instrument'], columns='Metric', values='value').reset_index()
+        df.columns.name = None
+        return df
+    except Exception as e:
+        logger.error(f"An error occurred during reshaping: {e}")
+        return pd.DataFrame()  # Return an empty DataFrame in case of an error
 
 def load_historical_data(universe, fields, interval, start_date, end_date):
     """
@@ -233,7 +268,7 @@ def load_historical_data(universe, fields, interval, start_date, end_date):
                 if df is None:
                     df = data
                 else:
-                    df = df.merge(data, on=['Date', 'Instrument'], how='outer')
+                    df = df.merge(data, on=['Date', 'Instrument'], how='outer', suffixes=('', f'_{historic_set}'))
             except Exception as e:
                 logger.error(f"An error occurred while fetching historical data for {historic_set}: {e}")
     
@@ -289,7 +324,7 @@ def rename_columns(data, col_mapping=col_mapping):
     data = data[col_mapping.values()]
     return data
 
-def load_all(universe, fields=fields, interval='yearly', start_date='2019-01-01', end_date='2020-01-01'):
+def load_all(universe, fields=fields, interval='yearly', start_date='2019-01-01', end_date='2020-01-01', debug_mode=False):
     """
     Combines static and historical data loading functions to return the complete dataset in a single call.
 
@@ -299,19 +334,27 @@ def load_all(universe, fields=fields, interval='yearly', start_date='2019-01-01'
         interval (str): Time interval for the data (e.g., 'daily', 'monthly', 'yearly').
         start_date (str): The start date for the data range in 'YYYY-MM-DD' format.
         end_date (str): The end date for the data range in 'YYYY-MM-DD' format.
+        debug_mode (bool): Flag to print logs of what successfully loads when.
 
     Returns:
         pandas.DataFrame: A DataFrame containing the complete data for the specified instruments and fields.
     """
     try:
         rd.open_session()
+        if debug_mode:
+            logger.info(f"Loading static data for universe: {universe}")
         static_data = rd.get_data(universe=universe, fields=fields['static'])
+        if debug_mode:
+            logger.info(f"Loading historical data for universe: {universe}")
         historic_data = load_historical_data(universe=universe, fields=fields, interval=interval, start_date=start_date, end_date=end_date)
+        if debug_mode:
+            logger.info(f"Combining static and historical data for universe: {universe}")
         data = static_data.merge(historic_data, how='outer', on='Instrument')
         data = rename_columns(data)
         data = coerce_dtypes(data)
+        data['year'] = data['date_val'].dt.year
     except Exception as e:
-        logger.error(f"An error occurred while loading data: {e}")
+        logger.error(f"An error occurred while loading data for universe: {universe}: {e}")
         data = None
     finally:
          rd.close_session()
@@ -344,29 +387,42 @@ def get_mock_universe():
     data.dropna(inplace=True)
     data['permID'] = data['permID'].astype('Int64').astype(str)
     data = data['permID'].drop_duplicates().tolist()
-    # bad_IDs = ['5000806590', '4295906670', '4296664080']
-    # data = [x for x in data if x not in bad_IDs]
     return data
 
-# Constants
-#LARGEST_MINING_COMPANIES=['2222.SE', 'XOM', 'CVX', 'SHEL.L', '601857.SS', 'TTEF.PA', 'GAZP.MM', 'COP', 'BP.L', 'ROSN.MM']
+
+def get_ftse_350():
+    """ Quick script to pull the tickers of the FTSE-350"""
+    ftse_100_firms = pd.read_csv('data/ftse_350/ftse_100.csv', usecols=['Instrument'])
+    ftse_250_firms = pd.read_csv('data/ftse_350/ftse_250.csv', usecols=['Instrument'])
+    data = pd.concat([ftse_100_firms, ftse_250_firms])
+    data = data['Instrument'].tolist()
+    return data
+
 
 def save_mock_universe():
-    MOCK_UNIVERSE = get_mock_universe()
+    MOCK_UNIVERSE = get_ftse_350()
     INTERVAL = '1Y'
     START_DATE = '2015-01-01'
     END_DATE = '2024-01-01'
-    CHUNK_SIZE = 10
+    CHUNK_SIZE = 50
 
-    data = pd.DataFrame()
-    chunk_num = 1
-    for chunk in chunk_list(MOCK_UNIVERSE , CHUNK_SIZE):
-        chunk_data = load_all(chunk, interval=INTERVAL, start_date=START_DATE, end_date=END_DATE)
-        data = pd.concat([data, chunk_data], ignore_index=True)
-        print(f'Successfully loaded chunk number {chunk_num}')
-        chunk_num += 1
-
-    data.to_pickle('data/mock_universe/mock_universe.pkl')
+    all_data = list()
+    for i, chunk in enumerate(chunk_list(MOCK_UNIVERSE , CHUNK_SIZE)):
+        logger.info(f'Processing chunk {i+1}')
+        try:
+            chunk_data = load_all(chunk, interval=INTERVAL, start_date=START_DATE, end_date=END_DATE, debug_mode=True)
+            if chunk_data is not None:
+                all_data.append(chunk_data)
+                logger.info(f"Successfully loaded and processed chunk {i+1}")
+        except Exception as e:
+            logger.error(f"An error occurred while processing chunk {i + 1} for firms {chunk}: {e}")
+    
+    if all_data:    
+        data = pd.concat(all_data, ignore_index=True)        
+        print('Data load complete.')
+        data.to_pickle('data/mock_universe/mock_universe.pkl')
+    else:
+        print('No data was saved to memory.')
     
 if __name__=="__main__":
     save_mock_universe()
