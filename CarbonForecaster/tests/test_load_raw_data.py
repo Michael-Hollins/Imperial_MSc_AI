@@ -1,8 +1,11 @@
 import pytest
 import pandas as pd
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from load_raw_data import is_string_or_single_item_list
-from load_raw_data import load_one_firm
+from load_raw_data import load_one_firm_history
+from load_raw_data import load_one_field_history
+from load_raw_data import reshape_multiple_firms_and_fields
+import warnings
 
 class TestStringOrSingleItem:
     def test_is_string(self):
@@ -38,8 +41,7 @@ class TestStringOrSingleItem:
     def test_is_set(self):
         assert is_string_or_single_item_list({"hello"}) == False, "Failed on set input"
         
-        
-# TODO: Add other tests for other functions
-        
+
+          
 if __name__ == "__main__":
     pytest.main()

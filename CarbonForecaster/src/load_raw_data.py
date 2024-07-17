@@ -1,5 +1,6 @@
 import refinitiv.data as rd
 import pandas as pd
+import numpy as np
 import re
 import logging
 import warnings
@@ -71,7 +72,7 @@ fields = {
         'TR.DownstreamScope3LeasedAssets',
         'TR.DownstreamScope3Franchises',
         'TR.DownstreamScope3Investments' 
-    ]
+    ],
 }
 
 col_mapping = {
@@ -138,7 +139,33 @@ def is_string_or_single_item_list(obj):
     return isinstance(obj, str) or (isinstance(obj, list) and len(obj) == 1 and isinstance(obj[0], str))
 
 
-def load_one_firm(universe, fields, interval, start_date, end_date):
+def consolidate(series):
+    '''
+    Consolidates cases where there are multiple observations for a given index by
+    selecting the first non-missing value for each column in the group.
+
+    Parameters:
+    series (pd.Series): A pandas Series containing values to be consolidated, 
+                        typically a single column from a group of rows sharing 
+                        the same index.
+
+    Returns:
+    The first non-missing value in the Series, or NaN if all values are missing.
+
+    Example:
+    Input DataFrame:
+        Date       |    Var 1     |      Var 2         |        Var 3
+        2022-03-31 |    Reported  |   3311733184.75    |       3097733184.75
+        2022-03-31 |        NA    |   311733184.75     |       3097733184.75
+    
+    Consolidated Output:
+        Date       |    Var 1     |      Var 2         |        Var 3
+        2022-03-31 |    Reported  |   3311733184.75    |       3097733184.75
+    '''
+    return series.dropna().iloc[0] if not series.dropna().empty else np.nan
+
+
+def load_one_firm_history(universe, fields, interval, start_date, end_date):
     """
     Loads historical data for a single firm.
 
@@ -172,11 +199,12 @@ def load_one_firm(universe, fields, interval, start_date, end_date):
         df = rd.get_history(universe=universe, fields=fields, interval=interval, start=start_date, end=end_date).reset_index()
         df['Instrument'] = df.columns.name
         df.columns.name = None
-
+    
+    df = df.groupby('Date').agg(consolidate).reset_index()
     return df
 
 
-def load_one_field(universe, fields, interval, start_date, end_date):
+def load_one_field_history(universe, fields, interval, start_date, end_date):
     """
     Loads historical data for multiple firms but a single field.
 
@@ -228,6 +256,8 @@ def reshape_multiple_firms_and_fields(df):
     try:
         df = df.reset_index().melt(id_vars=['Date'], var_name=['Instrument', 'Metric'])
         df = df.sort_values(by=['Date', 'Instrument', 'Metric', 'value'], na_position='last')
+        df['value'] = df['value'].replace([''], np.nan)
+        df = df.groupby(['Date', 'Instrument', 'Metric']).agg(consolidate).reset_index()
         df = df.drop_duplicates(subset=['Date', 'Instrument', 'Metric'], keep='first')
         df = df.pivot(index=['Date', 'Instrument'], columns='Metric', values='value').reset_index()
         df.columns.name = None
@@ -235,6 +265,7 @@ def reshape_multiple_firms_and_fields(df):
     except Exception as e:
         logger.error(f"An error occurred during reshaping: {e}")
         return pd.DataFrame()  # Return an empty DataFrame in case of an error
+
 
 def load_historical_data(universe, fields, interval, start_date, end_date):
     """
@@ -251,10 +282,10 @@ def load_historical_data(universe, fields, interval, start_date, end_date):
         pandas.DataFrame: A DataFrame containing the reshaped historical data for the specified instruments and fields.
     """
     if is_string_or_single_item_list(universe):
-        return load_one_firm(universe, fields, interval, start_date, end_date)
+        return load_one_firm_history(universe, fields, interval, start_date, end_date)
     
     if is_string_or_single_item_list(fields):
-        return load_one_field(universe, fields, interval, start_date, end_date)
+        return load_one_field_history(universe, fields, interval, start_date, end_date)
     
     df = None
 
@@ -309,6 +340,7 @@ def coerce_dtypes(df, numeric_cols=numeric_cols, string_cols=string_cols):
     df[string_columns] = df[string_columns].astype(str)
     return df
 
+
 def rename_columns(data, col_mapping=col_mapping):
     """
     Renames columns according to a column mapping dictionary and reorders them.
@@ -324,7 +356,8 @@ def rename_columns(data, col_mapping=col_mapping):
     data = data[col_mapping.values()]
     return data
 
-def load_all(universe, fields=fields, interval='yearly', start_date='2019-01-01', end_date='2020-01-01', debug_mode=False):
+
+def load_all(universe, fields=fields, interval='1Y', start_date='2019-01-01', end_date='2020-01-01', debug_mode=False):
     """
     Combines static and historical data loading functions to return the complete dataset in a single call.
 
@@ -397,20 +430,15 @@ def get_ftse_350():
     data = pd.concat([ftse_100_firms, ftse_250_firms])
     data = data['Instrument'].tolist()
     return data
+    
 
-
-def save_mock_universe():
-    MOCK_UNIVERSE = get_ftse_350()
-    INTERVAL = '1Y'
-    START_DATE = '2015-01-01'
-    END_DATE = '2024-01-01'
-    CHUNK_SIZE = 50
+def save_data_from_api(universe, interval, start_date, end_date, chunk_size, filename):
 
     all_data = list()
-    for i, chunk in enumerate(chunk_list(MOCK_UNIVERSE , CHUNK_SIZE)):
+    for i, chunk in enumerate(chunk_list(universe , chunk_size)):
         logger.info(f'Processing chunk {i+1}')
         try:
-            chunk_data = load_all(chunk, interval=INTERVAL, start_date=START_DATE, end_date=END_DATE, debug_mode=True)
+            chunk_data = load_all(chunk, start_date=start_date, interval=interval, end_date=end_date, debug_mode=False)
             if chunk_data is not None:
                 all_data.append(chunk_data)
                 logger.info(f"Successfully loaded and processed chunk {i+1}")
@@ -418,11 +446,35 @@ def save_mock_universe():
             logger.error(f"An error occurred while processing chunk {i + 1} for firms {chunk}: {e}")
     
     if all_data:    
-        data = pd.concat(all_data, ignore_index=True)        
-        print('Data load complete.')
-        data.to_pickle('data/mock_universe/mock_universe.pkl')
+        data = pd.concat(all_data, ignore_index=True)
+        data.to_pickle(filename)
     else:
         print('No data was saved to memory.')
+
+
+def load_from_excel(data_dir, static_sheet_name, timeseries_sheet_name):
+
+    # Load and combine 
+    static_data = pd.read_excel(data_dir, sheet_name=static_sheet_name)
+    static_data.columns.values[0] = 'Instrument'
+
+    historic_data = pd.read_excel(data_dir, sheet_name=timeseries_sheet_name)
+    historic_data.columns.values[0] = 'Date'
+    historic_data.columns.values[1] = 'Instrument'
     
+    data = static_data.merge(historic_data, on='Instrument')
+    
+    # Apply simple transformations   
+    data = rename_columns(data)
+    data = coerce_dtypes(data)
+    data['year'] = data['date_val'].dt.year
+    return data
+
+   
 if __name__=="__main__":
-    save_mock_universe()
+    save_data_from_api(universe=get_ftse_350(),
+                  interval='quarterly',
+                  start_date='2014-01-01',
+                  end_date='2025-01-01',
+                  chunk_size=50,
+                  filename='data/ftse_350/ftse350_from_api.pkl')
