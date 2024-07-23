@@ -1,8 +1,7 @@
 from load_raw_data import load_from_excel
-from clean_raw_data import process_missings_from_load
-from clean_raw_data import keep_last_observation_per_year
+from clean_raw_data import clean_raw_data_from_load
 import pandas as pd
-
+from load_raw_data import col_mapping
 
 """
 The purpose of this script is to understand the best way to load the data. 
@@ -65,9 +64,9 @@ def filter_dataframes(df1, df2, common_keys, key_cols):
     n_df1_filtered = len(df1_filtered)
     n_df2_filtered = len(df2_filtered)
     if n_df1 > n_df1_filtered:
-        print(f"Dropped {n_df1 - n_df1_filtered} row(s) from {df1}")
+        print(f"Dropped {n_df1 - n_df1_filtered} row(s) from df1")
     if n_df2 > n_df2_filtered:
-        print(f"Dropped {n_df2 - n_df2_filtered} row(s) from {df2}")
+        print(f"Dropped {n_df2 - n_df2_filtered} row(s) from df2")
     return df1_filtered, df2_filtered
 
 
@@ -132,66 +131,70 @@ def inspect_non_matching_rows(df1, df2, indices, firm_details):
         input("Press Enter to continue to the next row...")
         
 
+def match_absolute_and_relative_financial_years(excel_file_path, api_file_path):
+    """
+    Matches absolute and relative financial years by aligning revenues from two data sources.
+
+    This function reads data from an Excel file and a pickled DataFrame, sorts and filters the data,
+    and then merges the two DataFrames based on matching 'instrument' and 'revenue' values. It returns
+    a DataFrame with 'instrument', 'absolute_financial_year', and 'relative_financial_year'.
+    
+    This is needed because some firms have the previous financial year as e.g. 2023 and others have it as 2024.
+
+    Args:
+        excel_file_path (str): The file path to the Excel file containing 'static_data' and 'historical_data'.
+        api_file_path (str): The file path to the pickled DataFrame.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing 'instrument', 'absolute_financial_year', and 'relative_financial_year'
+                      for matching 'instrument' and 'revenue' values from the two data sources.
+    """
+    df_excel = load_from_excel(excel_file_path, 'static_data', 'historical_data')
+    df_excel = df_excel[['instrument', 'absolute_financial_year', 'revenue', 'source_filing_date']].dropna()
+    
+    df_api = pd.read_pickle(api_file_path)
+    df_api = df_api[['instrument', 'relative_financial_year', 'revenue', 'source_filing_date']].dropna()
+    
+    firms_by_year = df_excel.merge(df_api, on=['instrument', 'revenue', 'source_filing_date'])
+    return firms_by_year[['instrument', 'source_filing_date', 'absolute_financial_year', 'relative_financial_year']]
+
+
 if __name__=="__main__":
-    # Read in the data from the API call in load_raw_data
-    df_api = pd.read_pickle('data/ftse_350/ftse350_from_api.pkl')
-    df_api = process_missings_from_load(df_api, year_lower=2015, year_upper=2024, verbose=False)
-    df_api = keep_last_observation_per_year(df_api)
+    excel_file_path='data/ftse_350/databook.xlsx'
+    api_file_path='data/ftse_350/api_call.pkl'
+    historic_cols = list(col_mapping.values())[9:]
+    df_financial_years = match_absolute_and_relative_financial_years(excel_file_path, api_file_path)
     
-    # Read in the data from the Excel WorkSpace plugin
-    df_excel = load_from_excel('data/ftse_350/databook.xlsx', 'static_data', 'historical_data')
-    df_excel = process_missings_from_load(df_excel, year_lower=2015, year_upper=2024, verbose=False)
-    df_excel = keep_last_observation_per_year(df_excel)
+    df_api = pd.read_pickle(api_file_path)
+    df_api = clean_raw_data_from_load(df_api, group_cols=['instrument', 'relative_financial_year'], historical_cols=historic_cols)
+    df_api = df_api.merge(df_financial_years, how='inner', on=['instrument', 'relative_financial_year', 'source_filing_date'])
+    df_api.sort_values(by=['instrument', 'source_filing_date'], inplace=True)
+
+    df_excel = load_from_excel(excel_file_path, static_sheet_name='static_data', timeseries_sheet_name='historical_data')
+    df_excel = clean_raw_data_from_load(df_excel, group_cols=['instrument', 'absolute_financial_year'], historical_cols=historic_cols)
+    df_excel = df_excel.merge(df_financial_years, how='inner', on=['instrument', 'absolute_financial_year', 'source_filing_date'])
+    df_excel.sort_values(by=['instrument', 'source_filing_date'], inplace=True)
+    df_excel = df_excel[list(df_api.columns)]
     
-    # Keep observations that are common between them so we can compare values
-    common_firm_year_combinations = identify_common_keys(df_api, df_excel, key_cols=['firm_name', 'year'])
-    df_api, df_excel = filter_dataframes(df_api, df_excel, common_keys=common_firm_year_combinations, key_cols=['firm_name', 'year'])
+    mismatched_indices = compare_dataframes(df_api, df_excel, cols_to_check=historic_cols)
+    inspect_non_matching_rows(df_api, df_excel, mismatched_indices, firm_details=['firm_name', 'source_filing_date'])
     
-    firm_details = ['firm_name', 'year']
-    financials = ['revenue', 'ev', 'employees', 'mcap', 'ebit', 'net_cash_flow', 'net_ppe', 'cogs', 'intangible_assets', 'lt_debt']
-    production = ['prod_crude_oil', 'prod_natural_gas_liquids', 'prod_nat_gas', 'waste']
-    co2e = ['s1_co2e', 's2_co2e', 's3_co2e', 'co2e_method']
-    cols_to_check = firm_details + financials + production + co2e
+    # historical_cols = list(col_mapping.values())[9:]
+    # observations = ['firm_name', 'financial_year']
+#     df_api = clean_raw_data_from_load(df_api, group_cols=observations, historical_cols=historical_cols)
+#     df_api = df_api[(df_api['financial_year'] >= 2015) & (df_api['financial_year'] <= 2023)]
     
-    mismatched_indices = compare_dataframes(df_api, df_excel, cols_to_check)
+#     common_firm_year_combinations = identify_common_keys(df_api, df_excel, key_cols=observations)
+#     df_api, df_excel = filter_dataframes(df_api, df_excel, common_keys=common_firm_year_combinations, key_cols=observations)
     
-    # Inspect each and compare against the WorkSpace Terminal values
-    inspect_non_matching_rows(df_api, df_excel, mismatched_indices, firm_details)
+#     mismatched_indices = compare_dataframes(df_api, df_excel, cols_to_check=historical_cols)
     
-    # id    | Firm              | Mismatch        | Correct df
-    # ------------------------------------------------------
-    # 21    | 4Imprint          | Financials      | API
-    # 27    | 4Imprint          | Financials      | API
-    # 232   | Astom Martin      | CO2e            | API
-    # 342   | Baillie Gifford JP| CO2e            | API
-    # 343   | Baillie Gifford JP| CO2e            | API
-    # 411   | Barclays PLC      | Production      | API
-    # 593   | Burberry Group    | CO2e            | API
-    # 649   | Carnival PLC      | Production      | API
-    # 675   | Chemring Group    | COGS            | API
-    # 854   | Direct Line       | Financials      | Excel
-    # 855   | Direct Line       | Financials      | API
-    # 1254  | Greggs PLC        | Financials      | API
-    # 1260  | Greggs PLC        | Financials      | API
-    # 1401  | Hilton Food Group | Financials      | API
-    # 1407  | Hilton Food Group | Financials      | API
-    # 1505  | ITV               | CO2e            | API
-    # 1591  | International...  | CO2e            | API
-    # 1610  | International...  | CO2e            | Unsure 
-    # 1806  | Keller Group PLC  | CO2e            | API
-    # 1854  | Law Debenture     | CO2e            | API
-    # 1957  | Melrose Industries| CO2e            | API
-    # 2026  | Monks Investment  | Financials      | Excel (for 2024)
-    # 2273  | Persimmon PLC     | CO2e            | API
-    # 2463  | Renewables Infra  | CO2e            | API
-    # 2464  | Renewables Infra  | CO2e            | API
-    # 2492  | Rentokil Initial  | CO2e            | API
-    # 2509  | Rio Tinto         | CO2e            | API
-    # 2510  | Rio Tinto         | CO2e            | API
-    # 2540  | Ruffer Investment | CO2e            | API
-    # 2582  | Safestore Holdings| Financials      | API
-    # 2829  | Syncona Ltd       | CO2e            | API
-    # 3141  | Weir Group        | Financials/CO2e | API
+# #     # Inspect each and compare against the WorkSpace Terminal values
+#     inspect_non_matching_rows(df_api, df_excel, mismatched_indices, firm_details=observations)
+    
+#     # id    | Firm              | Mismatch        | Correct df
+#     # ------------------------------------------------------
+
     
     
     
