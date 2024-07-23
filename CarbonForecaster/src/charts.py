@@ -2,12 +2,13 @@ import pandas as pd
 import os
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scripts.custom_functions import plot_remove_labels
+from utilities import plot_remove_labels
+from eda import get_s3_prop_by_industry
 
 # Set parameters
 sns.set_style("whitegrid")
-data_path = 'C:/Users/micha/OneDrive/Documents/AI_MSc/thesis/Imperial_MSc_AI/data'
-figure_path = 'C:/Users/micha/OneDrive/Documents/AI_MSc/thesis/Imperial_MSc_AI/report/figures'
+data_path = 'C:/Users/micha/OneDrive/Documents/AI_MSc/thesis/Imperial_MSc_AI/CarbonForecaster/data'
+figure_path = 'C:/Users/micha/OneDrive/Documents/AI_MSc/thesis/Imperial_MSc_AI/CarbonForecaster/report/figures'
 plot_width_inch = 3   
 plot_height_inch = 2   
 dpi = 300
@@ -105,3 +106,31 @@ plt.yticks([])
 plt.legend(loc='center', bbox_to_anchor=(0.5, -0.15), ncol=2, frameon=False, fontsize='small')
 fig.savefig(os.path.join(figure_path, 's3_2021_vol.png'), dpi=dpi)
 plt.close()
+
+#######################################################
+
+# Scope 3 share by upstream and downstream splits by sector
+data = pd.read_csv('data/ftse_350/clean_from_excel.csv')
+data = get_s3_prop_by_industry(data, verbose=False)
+data['downstream'] = data['upstream'] + data['downstream']
+data = data.sort_values('downstream', ascending=True)
+
+fig, ax = plt.subplots(figsize=(plot_width_inch*2, plot_height_inch*2), dpi=dpi)
+sns.set_theme(font_scale=0.9)
+sns.set_color_codes("pastel")
+sns.barplot(x="downstream", y="icb_industry_name", data=data, label="Downstream", color="b", edgecolor='black')
+sns.set_color_codes("muted")
+sns.barplot(x="upstream", y="icb_industry_name", data=data, label="Upstream", color="b", edgecolor='black')
+ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x:.0%}'))
+handles, labels = ax.get_legend_handles_labels()
+ax.grid(False)
+ax.legend(handles[::-1], labels[::-1], ncol=1, loc="upper right", frameon=False, fontsize=9)
+ax.set(xlim=(0, 1), ylabel="", xlabel="")
+plt.tick_params(axis='both', which='major', labelsize=7)
+sns.despine(left=True, bottom=True)
+plt.tight_layout()
+plt.subplots_adjust(left=0.2)
+fig.savefig(os.path.join(figure_path, 's3_upstream_downstream_shares_by_sector.png'), dpi=dpi)
+plt.close()
+
+#######################################################
