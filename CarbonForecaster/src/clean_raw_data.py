@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from load_raw_data import load_from_excel
 from load_raw_data import col_mapping
-
+import pickle
 
 def match_absolute_and_relative_financial_years(excel_file_path, api_file_path):
     """
@@ -224,16 +224,22 @@ def get_mcap(source):
 
 if __name__=="__main__":
     # Load the data
-    data = load_from_excel('data/ftse_350/databook.xlsx', static_sheet_name='static_data', timeseries_sheet_name='historical_data')
+    file_path = 'data/ftse_global_allcap.pkl'
+    with open(file_path, 'rb') as file:
+        data = pickle.load(file)
+   
     # Basic cleaning
-    grp_cols = ['firm_name', 'absolute_financial_year']
-    historic_cols = list(col_mapping.values())[9:]
+    grp_cols = ['instrument', 'financial_year']
+    revenue_index = data.columns.get_loc("revenue")
+    historic_cols = list(data.columns[revenue_index:])
+    data = standardise_missing_values(data)
+    data = mask_non_reported_co2e(data)
     data = clean_raw_data_from_load(data, group_cols=grp_cols, historical_cols=historic_cols)
-    data['year'] = data['absolute_financial_year'].str.replace('FY', '').astype(int)
-    data = data[(data['year'] >= 2015) & (data['year'] <= 2023)]
+    data['year'] = data['financial_year'].str.replace('FY', '').astype(int)
+    data = data[(data['year'] >= 2016) & (data['year'] <= 2023)]
 
-    mcap = get_mcap('data/ftse_350/databook.xlsx')
-    data = data.merge(mcap, on=['instrument', 'year'], how='left')
+    # # mcap = get_mcap('data/ftse_350/databook.xlsx')
+    # # data = data.merge(mcap, on=['instrument', 'year'], how='left')
     
     # Save
-    data.to_csv('data/ftse_350/clean_from_excel.csv', index=False)
+    data.to_csv('data/ftse_global_allcap_clean.csv', index=False)

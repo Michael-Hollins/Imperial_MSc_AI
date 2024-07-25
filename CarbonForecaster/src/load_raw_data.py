@@ -4,6 +4,7 @@ import numpy as np
 import re
 import logging
 import warnings
+import itertools
 import pickle
 
 # Initialize logging
@@ -18,15 +19,12 @@ fields = {
     'static':[
         'TR.CommonName',
         'TR.HQCountryCode',
-        'TR.SEDOL',
         'TR.ICBIndustryCode',
         'TR.ICBIndustry',
         'TR.ICBSupersectorCode',
-        'TR.ICBSupersector'
-        ],
-    'dates':[
-        'TR.F.PeriodEndDate',
-        'TR.F.SourceDate'
+        'TR.ICBSupersector',
+        'TR.ICBSectorCode',
+        'TR.ICBSector',
         ],
     'business_metrics':[
         'TR.F.EV', 
@@ -78,21 +76,17 @@ fields = {
     ],
 }
 
-static_fields = fields['static']
-historical_fields = fields['dates'] + fields['business_metrics'] + fields['industry_production'] + fields['emissions'] + fields['co2e'] + fields['scope3upstream'] + fields['scope3downstream'] 
-
 col_mapping = {
     'Instrument': 'instrument',
-    'FY': 'financial_year',
+    'Financial Period Absolute': 'financial_year',
     'Company Common Name': 'firm_name',
     'Country ISO Code of Headquarters': 'cc_hq',
-    'SEDOL': 'sedol',
     'ICB Industry code': 'icb_industry_code',
     'ICB Industry name': 'icb_industry_name',
     'ICB Supersector code': 'icb_supersector_code',
     'ICB Supersector name': 'icb_supersector_name',
-    'Period End Date': 'period_end_date',
-    'Source Filing Date Time': 'source_filing_date',
+    'ICB Sector code': 'icb_sector_code',
+    'ICB Sector name': 'icb_sector_name',
     'Revenue from Business Activities - Total': 'revenue',
     'Enterprise Value' :'ev',
     'Employees - Full-Time/Full-Time Equivalents - Period End': 'employees',
@@ -130,43 +124,6 @@ col_mapping = {
     'Downstream scope 3 emissions Investments': 's3_investments_cat15'   
 }
 
-numeric_cols = [re.compile(r"_code$"), "revenue", "ev", "employees", "mcap", re.compile(r"_co2e$"), re.compile(r"^s3")]
-string_cols = ['instrument', 'co2e_method']
-
-def coerce_dtypes(df, numeric_cols=numeric_cols, string_cols=string_cols):
-    """
-    Coerces specified columns in a DataFrame to numeric or string format.
-
-    Args:
-        df (pandas.DataFrame): The input DataFrame.
-        numeric_cols (list): List of column names and regex patterns for columns to be coerced to numeric.
-        string_cols (list): List of column names and regex patterns for columns to be coerced to string.
-
-    Returns:
-        pandas.DataFrame: The DataFrame with specified columns coerced.
-    """
-    def is_numeric_col(column):
-        for pattern in numeric_cols:
-            if isinstance(pattern, str) and column == pattern:
-                return True
-            elif isinstance(pattern, re.Pattern) and pattern.search(column):
-                return True
-        return False
-    
-    def is_string_col(column):
-        for pattern in string_cols:
-            if isinstance(pattern, str) and column == pattern:
-                return True
-            elif isinstance(pattern, re.Pattern) and pattern.search(column):
-                return True
-        return False
-    
-    numeric_columns = [col for col in df.columns if is_numeric_col(col)]
-    string_columns = [col for col in df.columns if is_string_col(col)]
-    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
-    df[string_columns] = df[string_columns].astype(str)
-    return df
-
 
 def rename_columns(data, col_mapping=col_mapping):
     """
@@ -199,14 +156,11 @@ def chunk_list(lst, chunk_size):
         yield lst[i:i + chunk_size]
 
 
-def get_ftse_350():
-    """ Quick script to pull the tickers of the FTSE-350"""
-    ftse_100_firms = pd.read_csv('data/ftse_350/ftse_100.csv', usecols=['Instrument'])
-    ftse_250_firms = pd.read_csv('data/ftse_350/ftse_250.csv', usecols=['Instrument'])
-    data = pd.concat([ftse_100_firms, ftse_250_firms])
-    data = data['Instrument'].sort_values().tolist()
-    return data
-    
+def get_ftse_all_cap_universe():
+    ftse_all_cap = pd.read_csv('data/FTSE_Global_AllCap_2022.csv', usecols=['Constituent RIC']).dropna().drop_duplicates().values.tolist()
+    ftse_all_cap = [item[0] for item in ftse_all_cap] 
+    return ftse_all_cap
+
 
 def load_from_excel(data_dir, static_sheet_name, timeseries_sheet_name):
 
@@ -227,59 +181,54 @@ def load_from_excel(data_dir, static_sheet_name, timeseries_sheet_name):
     return data
 
 
-def call_data_from_api(universe,
-                       fields):
-    # Define years to loop over 
-    fin_yrs = ["FY" + str(i) for i in range(-15, 1)]
+def save_raw_data_from_api(file_dir, universe, fields, financial_years, parameters):
+    static_fields = fields['static']
+    historical_fields = fields['business_metrics'] + fields['industry_production'] + fields['emissions'] + fields['co2e'] + fields['scope3upstream'] + fields['scope3downstream'] 
     
     rd.open_session()
-    static_data = rd.get_data(universe=universe, fields=fields['static'])
-    historic_data= list()
-    for relative_fin_yr in fin_yrs:
-        fy_data= rd.get_data(universe=universe, fields=historical_fields, parameters = {'SDate': relative_fin_yr, 'Curn': 'USD'})
-        fy_data['FY'] = relative_fin_yr
-        historic_data.append(fy_data)
-    data = pd.concat(historic_data, ignore_index=True)
-    data = static_data.merge(data, how='outer', on='Instrument')
-    data = rename_columns(data)
-    data = coerce_dtypes(data)
-    data.rename(columns={'financial_year':'relative_financial_year'}, inplace=True)
+    
+    # Create firm-year combinations
+    all_potential_observations = list(itertools.product(universe, financial_years))
+    all_potential_observations = pd.DataFrame(all_potential_observations, columns = ['Instrument', 'Financial Period Absolute'])
+    
+    # Load the static data e.g. company name, HQ country, sector
+    static_data = list()
+    for chunk in chunk_list(lst=universe, chunk_size=500):
+        data = rd.get_data(universe=chunk, fields=static_fields)
+        static_data.append(data)
+    static_data = pd.concat(static_data, ignore_index=True)
+    
+    # The base dataframe 
+    data = all_potential_observations.merge(static_data, on='Instrument', how='outer')
+    
     rd.close_session()
-    return data
-
-
-def get_fundamentals_in_chunks(universe,
-                       fields,
-                       chunk_size,
-                       filename):
     
-    all_data = list()
-    for i, chunk in enumerate(chunk_list(universe, chunk_size=chunk_size)):
-        logger.info(f'Processing chunk {i+1}')
-        try:
-            chunk_data = call_data_from_api(universe=universe, fields=fields)
-            if chunk_data is not None:
-                all_data.append(chunk_data)
-                logger.info(f"Successfully loaded and processed chunk {i+1}")
-        except Exception as e:
-            logger.error(f"An error occurred while processing chunk {i + 1} for firms {chunk}: {e}")
+    # Load the historical variables one at a time, and join on using their fperiod
+    for field in historical_fields:
+        rd.open_session()
+        flds = [field, field + '.fperiod'] # [field_name, field_name.fperiod]
+        print(f"Loading data for {field}")
+        historical_data = list()
+        for chunk in chunk_list(lst=universe, chunk_size=500):
+            temp = rd.get_data(universe=chunk, fields=flds, parameters=parameters)
+            historical_data.append(temp)
+        historical_data = pd.concat(historical_data, ignore_index=True)
     
-    if all_data:    
-        data = pd.concat(all_data, ignore_index=True)
-        data.drop_duplicates(inplace=True)
-        data.to_pickle(filename)
-    else:
-        print('No data was saved to memory.')
-        data = None
+        data = data.merge(historical_data, on = ['Instrument', 'Financial Period Absolute'], how = 'outer')
+        rd.close_session()
+        
+    # Rename columns and drop any duplicates
+    data = rename_columns(data)
+    data.drop_duplicates(inplace=True) 
+    
+    # Save
+    data.to_pickle(file_dir)
+    print(f"Data saved to {file_dir}")
     
     
 if __name__=="__main__":
-
-    # rd.open_session()
-    # test = rd.get_data(universe='3IN.L', fields=['TR.F.PeriodEndDate','TR.F.SourceDate','TR.CO2DirectScope1','TR.CO2IndirectScope2','TR.CO2IndirectScope3','TR.CO2EstimationMethod'], parameters={'SDate':'FY-2'})
-    # print(test.loc[test['Source Filing Date Time'] == '2022-05-10 06:15:14', ['CO2 Equivalent Emissions Indirect, Scope 2']])
-    # print(test.loc[test['source_filing_date']=='2022-05-10 06:15:14', ['s2_co2e']])
-    UNIVERSE = get_ftse_350()
-    CHUNK_SIZE = 100
-    FILENAME='data/ftse_350/api_call.pkl'
-    get_fundamentals_in_chunks(universe=UNIVERSE, fields=fields, chunk_size=CHUNK_SIZE, filename=FILENAME)
+    universe = get_ftse_all_cap_universe()
+    financial_years = ['FY' + str(i) for i in range(2016, 2024, 1)]
+    params = {"SDate" :0 , "EDate" :-8, "FRQ":"FY"}
+    
+    save_raw_data_from_api('data/ftse_global_allcap.pkl', universe=universe, fields=fields, financial_years=financial_years, parameters=params)
