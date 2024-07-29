@@ -15,10 +15,11 @@ logging.getLogger("httpx").setLevel(logging.WARNING)  # Suppress httpx INFO mess
 # Suppress specific warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="pandas.core.dtypes.cast")
 
+
 fields = {
     'static':[
         'TR.CommonName',
-        'TR.HQCountryCode',
+        'TR.CoRPrimaryCountryCode',
         'TR.ICBIndustryCode',
         'TR.ICBIndustry',
         'TR.ICBSupersectorCode',
@@ -76,17 +77,19 @@ fields = {
     ],
 }
 
+
 col_mapping = {
     'Instrument': 'instrument',
     'Financial Period Absolute': 'financial_year',
     'Company Common Name': 'firm_name',
-    'Country ISO Code of Headquarters': 'cc_hq',
+    'ISO2 Code of Primary Country of Risk': 'cc',
     'ICB Industry code': 'icb_industry_code',
     'ICB Industry name': 'icb_industry_name',
     'ICB Supersector code': 'icb_supersector_code',
     'ICB Supersector name': 'icb_supersector_name',
     'ICB Sector code': 'icb_sector_code',
     'ICB Sector name': 'icb_sector_name',
+    'Company Market Cap': 'mcap',
     'Revenue from Business Activities - Total': 'revenue',
     'Enterprise Value' :'ev',
     'Employees - Full-Time/Full-Time Equivalents - Period End': 'employees',
@@ -176,8 +179,32 @@ def load_from_excel(data_dir, static_sheet_name, timeseries_sheet_name):
     
     # Apply simple transformations   
     data = rename_columns(data)
-    data = coerce_dtypes(data)
     data.rename(columns={'financial_year':'absolute_financial_year'}, inplace=True)
+    return data
+
+
+def get_non_fundamentals(universe, fields, financial_years, parameters):
+    
+    data = list(itertools.product(universe, financial_years))
+    data = pd.DataFrame(data, columns = ['Instrument', 'Financial Period Absolute'])
+    
+    
+    for field in fields:
+        rd.open_session()
+        flds = [field, field + '.calcdate'] # [field_name, field_name.fperiod]
+        print(f"Loading data for {field}")
+        historical_data = list()
+        for chunk in chunk_list(lst=universe, chunk_size=500):
+            temp = rd.get_data(universe=chunk, fields=flds, parameters=parameters)
+            historical_data.append(temp)
+        historical_data = pd.concat(historical_data, ignore_index=True)
+        historical_data.rename(columns={'Calc Date': 'Financial Period Absolute'}, inplace=True)
+        historical_data['Financial Period Absolute'] = pd.to_datetime(historical_data['Financial Period Absolute'])
+        historical_data = historical_data.dropna()
+        historical_data['Financial Period Absolute'] = historical_data['Financial Period Absolute'].dt.year.astype(int)
+        historical_data['Financial Period Absolute'] = 'FY' + historical_data['Financial Period Absolute'].astype(str)
+        data = data.merge(historical_data, on = ['Instrument', 'Financial Period Absolute'], how = 'outer')
+        rd.close_session()
     return data
 
 
@@ -202,6 +229,10 @@ def save_raw_data_from_api(file_dir, universe, fields, financial_years, paramete
     data = all_potential_observations.merge(static_data, on='Instrument', how='outer')
     
     rd.close_session()
+    
+    # Get market cap data
+    non_fundamentals = get_non_fundamentals(universe=universe, fields = ['TR.CompanyMarketCap'], financial_years=financial_years, parameters=parameters)
+    data = data.merge(non_fundamentals, on = ['Instrument', 'Financial Period Absolute'], how = 'outer')
     
     # Load the historical variables one at a time, and join on using their fperiod
     for field in historical_fields:
@@ -229,6 +260,9 @@ def save_raw_data_from_api(file_dir, universe, fields, financial_years, paramete
 if __name__=="__main__":
     universe = get_ftse_all_cap_universe()
     financial_years = ['FY' + str(i) for i in range(2016, 2024, 1)]
-    params = {"SDate" :0 , "EDate" :-8, "FRQ":"FY"}
-    
-    save_raw_data_from_api('data/ftse_global_allcap.pkl', universe=universe, fields=fields, financial_years=financial_years, parameters=params)
+    params = {"SDate" :0 , "EDate" :-8, "FRQ":"FY", "Curn": "USD"}
+    save_raw_data_from_api('data/ftse_global_allcap.pkl',
+                           universe=universe,
+                           fields=fields,
+                           financial_years=financial_years,
+                           parameters=params)
