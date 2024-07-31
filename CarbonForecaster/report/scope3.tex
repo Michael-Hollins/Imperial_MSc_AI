@@ -303,36 +303,110 @@ Thus, the ML approaches tried so far appear disappointing both relative to simpl
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Project Plan}
-\section{Objectives and approach}
-The primary objective of this project is to develop a time series forecasting model for S3 estimation. My originality will be in the application of a state-of-the-art deep learning approach, namely using a Temporal Fusion
-Transformer(TFT). This has a number of advantages in a S3 context. First, it quantifies uncertainty by providing prediction intervals; this is crucial for applying the uncertainty principle \cite{Hoepner2021, olesiewicz2023}. Second, it is a highly flexible model, designed to handle different time series and various types of input. Third, has an emphasis on interpretability by allowing the user to understand the importance of different features. Finally, it exhibits strong performance in other domains relative to other statistical and ML approaches.
-\\\\
-As is clear from Section \ref{sec:Scope3Modelling}, it is not guaranteed that a more complex approach will yield superior results. Therefore, in line with the existing literature, I will apply a battery of time series forecasting approaches for comparison. These may include:
-\begin{itemize}
-    \item Simple sector/industry-country averages (naive)
-    \item Input/output models using EEIOs (naive)
-    \item OLS using firm size and fixed effects (naive)
-    \item Multivariate regression on firm characteristics (empirical)
-    \item Stepwise regression (empirical)
-    \item Simple autoregressive model e.g. AR(1)/ARIMA (empirical)
-    \item LASSO/Elastic net regression (empirical)
-    \item XGBoost/AdaBoost (ML)
-    \item Random forest (ML)
-    \item Linear tree/forest (ML)
-    \item LSTM/RNN (DL)
-    \item TFT (DL)
-\end{itemize}
+\chapter{Data}
 
-As a secondary objective, I will also apply these techniques to S1 and S2 data to see if they result in improvements over existing estimation methods in the database.  
+As this project is in collaboration with the London Stock Exchange Group (LSEG), the data on which my analysis is based is sourced from LSEG Datastream, a global, historical, financial database covering all major asset classes and economic indicators. The data delivery mechanisms include a Desktop application, an Excel plug-in and a feed via an application programming interface (API) available through the \textsc{refinitiv-data} Python package.\footnote{For further detail on LSEG Datastream see \href{https://www.lseg.com/en/data-analytics/financial-data/company-data/company-fundamentals-data#feature-and-benefits}{here}.}
 \\\\
-\section{Progress made so far}
-A thorough review of the domain literature has been completed, and so I intend to re-use Section \ref{sec:ChapterBackground} for my project subject to feedback. However, a key issue is that \textbf{I have not yet been granted access to any data from LSEG Refinitiv, my industrial partner.} 
-\\\\
-An indicative timeline would be around one month for data cleaning/exploratory data analysis/descriptive statistics (June); one and a half months for modelling (July to mid-August); one month for the write up (mid-August to mid-September). 
+To ensure global coverage of firms across different industries, I use the FTSE All-World Index constituents as my universe. Originally launched in the year 2000, as of June 2024 it covers 98 percent of the world's investable market by capitalisation and contains around 4300 large and mid-cap firms \cite{FTSERussell2024}.  
+
+\begin{figure}[H]
+\centering
+\caption{FTSE All-World Index}
+	\begin{subfigure}[t]{0.475\textwidth}
+		\centering
+	      \caption{Number of instruments per year}
+	      \label{fig:InstrumentsPerYear}
+	      \includegraphics[width=\linewidth]{data\_coverage.png}
+	      \fnote{I use instruments to account for dual-listings}
+	\end{subfigure}
+	
+	%\begin{subfigure}[t]{0.475\textwidth}
+	%	\centering
+	%	\caption{Percentage of 2021 reported S3 data within YoY variation thresholds}
+	%	\label{fig:Scope3Volatility}
+	%	\includegraphics[width=\linewidth]{s3_2021_vol.png}
+	%	\fnote{Source: FTSE-Russell \cite{ftserussell2024}, reporting entities are from %the FTSE All-World constituents that disclose S3 emissions}
+	%\end{subfigure}
+\end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\chapter{Exploratory Analysis}
+\chapter{Empirical Approach}
+
+The goal of this paper is to investigate the best method to estimate missing carbon emissions data; using the best way to impute the missing data, we are then in a position to evaluate which approach to forecasting carbon emissions could be the best.
+
+\begin{figure}[H]\label{fig:ModellingApproach}
+\centering
+\caption{Stylised representation of modelling strategy}
+
+\begin{subfigure}[t]{0.475\textwidth}
+    \centering
+    \includegraphics[width=\linewidth, trim=4 4 4 4,clip]{problem_statement_1.png}
+    \caption{Starting situation}
+    \label{fig:ModellingApproach1}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.475\textwidth}
+    \centering
+    \includegraphics[width=\linewidth, trim=4 4 4 4,clip]{problem_statement_2.png}
+    \caption{Estimating $t-1$ of first observation}
+    \label{fig:ModellingApproach2}
+\end{subfigure}
+
+\vspace{0.5cm}
+
+\begin{subfigure}[t]{0.475\textwidth}
+    \centering
+    \includegraphics[width=\linewidth, trim=4 4 4 4,clip]{problem_statement_3.png}
+    \caption{Using best technique for full estimation}
+    \label{fig:ModellingApproach3}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.475\textwidth}
+    \centering
+    \includegraphics[width=\linewidth, trim=4 20 4 4,clip]{problem_statement_4.png}
+    \caption{Forecasting 2022 emissions}
+    \label{fig:ModellingApproach4}
+\end{subfigure}
+
+\end{figure}
+
+
+\section{Methods to compare}
+
+\subsection{Industry fill}
+
+\subsection{Regression}
+
+\subsection{XGBoost}
+
+\subsection{TFT}
+- deep learning and time series forecasting
+% https://towardsdatascience.com/introducing-pytorch-forecasting-64de99b9ef46
+
+% https://research.google/blog/interpretable-deep-learning-for-time-series-forecasting/
+
+% https://www.mdpi.com/2227-7390/12/10/1504
+
+% https://onlinelibrary.wiley.com/doi/full/10.1111/joes.12429?casa_token=IoC174PlVa4AAAAA%3AoYq0VdfaA9bLbfdAT1jOzIDjexjfZ6wr2Aof6623LAaweaBFx8fuWKxasNc0h1Khv8X04Q4e9UHf3g
+\section{Imputing missing data}
+
+As already described in Section \ref{sec:DataGenIssues} and documented in Section \ref{sec:ExploratoryAnalysis}, missing data is among the primary issues in relation to S3 emissions data. In this Section, I employ, compare, and contrast a variety of models to impute the missing data.
+\\\\
+This raises the question of how we can evaluate the merits of one estimate over another where data is missing. Unlike a missing data point which might easily be filled in by carrying past observations forward, many firms never report in the first place. In light of this, I adopt an approach similar to that of \cite{KalesnikVitali2022}: if a firm begins reporting emissions at time $t$, we can estimate emissions for time $t-1$ and compare and compare the two. 
+\\\\
+However, this relies on the assumption that emissions are persistent. If they are persistent, then subsequently reported data can be deemed a reliable proxy for historical emissions. However, if emissions are not persistent, then reported values at $t$ will not be informative about the quality of the estimates. Therefore, I use an ancillary model to justify this assumption.
+
+\subsection{How persistent are companies' emissions?}
+
+\section{Estimating missing data}
+
+\section{Forecasting emissions}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Exploratory Analysis}\label{sec:ExploratoryAnalysis}
+
+
 \section{Data quality}
 \subsection{Relevance and completeness metrics for each category}\label{sec:RelevanceCompletenessMetrics}
 
@@ -399,7 +473,7 @@ Final S3 emissions estimates are selected by their data quality. Reported data i
 	\centering
 	\caption{LSEG scope 3 data and estimates selection hierarchy}
 	\label{fig:LSEGS3Models}
-	\includegraphics[width=\textwidth]{report/figures/LSEG_S3_flowchart.drawio.pdf}
+	\includegraphics[width=\textwidth]{CarbonForecaster/report/figures/LSEG_S3_flowchart.drawio.pdf}
 	\fnote{Source: Adapted from \cite{ftserussell2024}}
 \end{figure}
 
@@ -445,7 +519,9 @@ Another method to ameliorate multicollinearity is to use an elastic net which is
 
 \section{Assessment}
 
-There are several measures that can be used to compare models. The $R^{2}$ might lead to overfitting because it purely focuses on in-sample model performance. Therefore, to best predict emissions out of sample, we use the $MAE$ etc.
+There are several measures that can be used to compare models. The $R^{2}$ might lead to overfitting because it purely focuses on in-sample model performance. Therefore, to best predict emissions out of sample, we use the $MAE$ etc. (See pp.22-23 of source 30).
+
+
 
 %% bibliography
 \bibliographystyle{plain}
