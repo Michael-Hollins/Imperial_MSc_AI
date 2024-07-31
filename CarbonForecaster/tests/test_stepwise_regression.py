@@ -1,5 +1,5 @@
 import pytest 
-from src.custom_functions import forward_step
+from stepwise_regression import forward_step
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -27,13 +27,12 @@ class TestForwardStep:
 
         new_features = forward_step(y, X, included_features, inclusion_threshold, verbose)
         
-        candidate_features = set(X.columns) - included_features
         expanded_features = list(included_features) + list(new_features)
         model = sm.OLS(y, sm.add_constant(X[expanded_features])).fit()
         p_values = model.pvalues
-        
+        print(p_values[new_features.pop()])
         for feature in new_features:
-            assert p_values[feature] < inclusion_threshold, f"Feature {feature} was added, but its p-value {p_values[feature]} is above the inclusion threshold."
+            assert p_values[feature].all() < inclusion_threshold, f"Feature {feature} was added, but its p-value {p_values[feature]} is above the inclusion threshold."
 
     def test_forward_step_no_insignificant_features(self):
         included_features = set(X.columns)

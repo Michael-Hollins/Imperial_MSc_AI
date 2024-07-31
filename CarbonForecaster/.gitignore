@@ -5,6 +5,7 @@ primary_sources/
 __pycache__/
 *.py[cod]
 *$py.class
+*.pytest_cache
 
 # Python Virtual Environments
 .venv/
@@ -64,8 +65,15 @@ tb_logs/*
 *.ckpt
 
 # Ignore data
-../data/
+data/
+
+# Ignore logs
+lightning_logs/
 
 # Package build
 src/CarbonForecaster*
 CarbonForecaster*
+dist
+
+# Refinitiv data config -- contains API key
+src/refinitiv-data.config.json
