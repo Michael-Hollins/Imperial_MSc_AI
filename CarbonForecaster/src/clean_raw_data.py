@@ -23,6 +23,7 @@ country_classification = {
     'DE': 'Advanced',  # Germany
     'GR': 'Advanced',  # Greece
     'HK': 'Advanced',  # Hong Kong SAR
+    'HU': 'Advanced',  # Hungary -- added manually
     'IS': 'Advanced',  # Iceland
     'IE': 'Advanced',  # Ireland
     'IL': 'Advanced',  # Israel
@@ -60,6 +61,7 @@ country_classification = {
     'BD': 'Developing',  # Bangladesh
     'BY': 'Developing',  # Belarus
     'BJ': 'Developing',  # Benin
+    'BM': 'Developing',  # Bermuda -- added manually
     'BT': 'Developing',  # Bhutan
     'BO': 'Developing',  # Bolivia
     'BA': 'Developing',  # Bosnia and Herzegovina
@@ -71,6 +73,7 @@ country_classification = {
     'KH': 'Developing',  # Cambodia
     'CM': 'Developing',  # Cameroon
     'CV': 'Developing',  # Cabo Verde
+    'KY': 'Developing',  # Cayman Islands -- added manually
     'CF': 'Developing',  # Central African Republic
     'TD': 'Developing',  # Chad
     'CL': 'Developing',  # Chile
@@ -217,25 +220,62 @@ def get_s3_cat_cols(df):
     return s3_cat_cols
 
 
+def change_zeros_to_missing(df, cols):
+    df[cols] = df[cols].replace(0, np.nan)
+    return df
+
+
 def mask_non_reported_co2e(df):
     """
-    Masks CO2e values where the co2e_method is not 'Reported'.
+    Masks CO2e values where the co2e method is not 'Reported'.
 
     This function first sets the co2e_method to either 'Reported' or missing. Next, it modifies the emissions columns 
-    to NaN for rows where the 'co2e_method' is not 'Reported'.
+    to NaN for rows where the relevant co2e method is not 'Reported'.
 
     Args:
-        df (pandas.DataFrame): The input DataFrame containing the columns 'co2e_method' and emissions data.
+        df (pandas.DataFrame): The input DataFrame containing the c02e method columns and emissions data.
 
     Returns:
-        pandas.DataFrame: The DataFrame with masked CO2e values where 'co2e_method' is not 'Reported'.
+        pandas.DataFrame: The DataFrame with masked CO2e values where the c02e method is not 'Reported'.
     """
-    df['co2e_method'] = df['co2e_method'].apply(lambda x: x if x == 'Reported' else np.nan)
+    # Document what values are reported in these fields
     s3_cat_cols = get_s3_cat_cols(df)
-    df.loc[df['co2e_method'] != 'Reported', ['s1_co2e', 's2_co2e', 's3_co2e',
-                                             'policy_emissions_score', 'target_emissions_score', 'emissions_trading_score'] + s3_cat_cols] = np.nan
+    s3_upstream_cols = s3_cat_cols[:8]
+    s3_downstream_cols = s3_cat_cols[8:]
+    df.loc[df['s1_co2e_method'] != 'Reported_value', 's1_co2e'] = np.nan
+    df.loc[df['s2_co2e_method'] != 'Reported_value', 's2_co2e'] = np.nan
+    df.loc[df['s3_upstream_co2e_method'] != 'Reported_value', s3_upstream_cols] = np.nan
+    df.loc[df['s3_downstream_co2e_method'] != 'Reported_value', s3_downstream_cols] = np.nan
+    # TODO: Think about how to mask s3_co2e
     return df
     
+
+def create_new_emissions_aggregates(df):
+    # Create some additional emissions aggregates to inspect
+    df['s1_and_s2_co2e'] = df['s1_co2e'].fillna(0) + df['s2_co2e'].fillna(0)
+    upstream_cols = ['s3_purchased_goods_cat1', 's3_capital_goods_cat2',
+        's3_fuel_energy_cat3', 's3_transportation_cat4', 's3_waste_cat5',
+        's3_business_travel_cat6', 's3_employee_commuting_cat7',
+        's3_leased_assets_cat8']
+    downstream_cols = ['s3_distribution_cat9',
+        's3_processing_products_cat10', 's3_use_of_sold_cat11',
+        's3_EOL_treatment_cat12', 's3_leased_assets_cat13',
+        's3_franchises_cat14', 's3_investments_cat15']
+    df['s3_upstream'] = df[upstream_cols].sum(axis=1, skipna=True)
+    df['s3_downstream'] = df[downstream_cols].sum(axis=1, skipna=True)
+    df['s3_cat_total'] = df['s3_upstream'].fillna(0) + df['s3_downstream'].fillna(0)
+    
+    # Replace zeros from the aggregates to missings
+    df = change_zeros_to_missing(df, cols=['s1_and_s2_co2e', 's3_upstream', 's3_downstream', 's3_cat_total'])
+    
+    # Let's also replace the very few zeros in the aggregate scope columns to missings
+    df = change_zeros_to_missing(df, cols=['s1_co2e', 's2_co2e', 's3_co2e'])
+    return df
+
+
+def get_absolute_emissions_cols(df):
+    return ['s1_co2e', 's2_co2e', 's1_and_s2_co2e', 's3_co2e'] + get_s3_cat_cols(df=df) + ['s3_upstream', 's3_downstream', 's3_cat_total']
+
 
 def consolidation_is_possible(df, group_cols, historical_cols):
     """
@@ -326,7 +366,7 @@ def consolidate_observations(df, group_cols, historical_cols):
 
     Args:
         df (pd.DataFrame): The input DataFrame containing the raw data.
-        group_cols (list): List of columns to group by (e.g., ['firm_name', 'year']).
+        group_cols (list): List of columns to group by (e.g., ['instrument', 'year']).
         historical_cols (list): List of historical columns to check for consolidation.
 
     Returns:
@@ -369,15 +409,69 @@ def drop_rows_with_all_missings(df, fields_to_check, verbose=False):
     return df
 
 
-def clean_raw_data_from_load(df, group_cols, historical_cols):
-    df = standardise_missing_values(df)
-    df = mask_non_reported_co2e(df)
-    df = consolidate_observations(df, group_cols=group_cols, historical_cols=historical_cols)
-    df = drop_rows_with_all_missings(df, fields_to_check=historical_cols)
+def remove_fundamentals_with_low_coverage(df, verbose=False):
+    cols_to_remove = ['gross_profit', 'current_assets', 'current_liabilities', 'inventories', 'cost_of_revenue']
+    if verbose:
+        print(f"Removed: {cols_to_remove}")
+    df = df.drop(columns=cols_to_remove)
     return df
 
 
-def convert_s3_emissions_to_intensities(df):
+def get_fundamentals_cols(df):
+    mcap_index = df.columns.get_loc("mcap")
+    ltdebt_index = df.columns.get_loc("lt_debt")
+    fundamental_cols = list(df.columns[mcap_index:ltdebt_index + 1])
+    return fundamental_cols
+
+
+def replace_and_fill_zeros_in_fundamentals(df, covariates):
+    df[covariates] = df[covariates].replace(0, np.nan)
+    df[covariates] = df.groupby('instrument', group_keys=False)[covariates].apply(lambda group: group.ffill().bfill())
+    return df
+
+
+def drop_dual_listing_duplicates(df):
+    """
+        Drops the dual-listed instruments for firms with multiple listings, keeping only the instrument with the most data points.
+
+        This function identifies firms that have multiple instruments (dual listings) and retains only the instrument 
+        that has the most non-missing data points for a selected subset of columns. The columns checked include both 
+        fundamental financial metrics and absolute emissions data.
+
+        Args:
+            df (pd.DataFrame): The input DataFrame containing firm data with columns 'firm_name' and 'instrument', 
+                            along with other fundamental and emissions-related columns.
+
+        Returns:
+            pd.DataFrame: A DataFrame with only one instrument per firm, specifically the instrument with the most 
+                        non-missing data points in the specified columns. If instruments have the same number of data points, 
+                        an arbitrary one is kept.
+    """
+    cols_to_audit = get_absolute_emissions_cols(df) + get_fundamentals_cols(df)
+    
+    firms_with_multiple_instruments = df.groupby('firm_name')['instrument'].nunique() > 1
+    filtered_df = df[df['firm_name'].isin(firms_with_multiple_instruments[firms_with_multiple_instruments].index)]
+      
+    # Keep only the instrument with the most data points per firm
+    instrument_counts = filtered_df.groupby(['firm_name', 'instrument'])[cols_to_audit].apply(lambda x: x.notnull().sum().sum())
+    instruments_to_drop = instrument_counts.groupby('firm_name').idxmin().apply(lambda x: x[1]).values
+    new_df = df[~df['instrument'].isin(instruments_to_drop)]
+    return new_df
+
+
+def clean_raw_data_from_load(df, group_cols, historical_cols):
+    df = standardise_missing_values(df)
+    df = mask_non_reported_co2e(df)
+    df = create_new_emissions_aggregates(df)
+    df = consolidate_observations(df, group_cols=group_cols, historical_cols=historical_cols)
+    df = drop_rows_with_all_missings(df, fields_to_check=historical_cols)
+    df = remove_fundamentals_with_low_coverage(df)
+    df = replace_and_fill_zeros_in_fundamentals(df, covariates=get_fundamentals_cols(df))
+    df = drop_dual_listing_duplicates(df)
+    return df
+
+
+def convert_emissions_to_intensities(df):
     """
     Convert Scope 3 emissions to intensities and create new columns.
 
@@ -393,14 +487,14 @@ def convert_s3_emissions_to_intensities(df):
     pd.DataFrame: The DataFrame with new columns for the Scope 3 emissions intensities,
                   where each new column name is the original column name appended with '_intensity'.
     """
-    s3_cat_cols = get_s3_cat_cols(df)
+    emissions_cols = get_absolute_emissions_cols(df=df)
     
-    for col in s3_cat_cols:
+    for col in emissions_cols:
         df[f'{col}_intensity'] = df[col] / (df['revenue'] / 1e6)
     return df
 
 
-def get_s3_cat_intensity_cols(df):
+def get_emissions_intensity_cols(df):
     """
     Extract column names from a DataFrame that match a specific pattern related to intensity.
 
@@ -414,7 +508,7 @@ def get_s3_cat_intensity_cols(df):
     Returns:
         list: A list of column names that match the specified pattern.
     """
-    pattern = re.compile(r'^s3_.*_cat\d+_intensity$')
+    pattern = re.compile(r'^.*_intensity$')
     s3_cat_intensity_cols = [col for col in df.columns if pattern.match(col)]
     return s3_cat_intensity_cols
 
@@ -439,27 +533,47 @@ def get_s3_cat_intensity_proportion_cols(df):
 
 
 def get_sector_cols():
-    return ['icb_industry_code', 'icb_industry_name', 'icb_supersector_code', 'icb_supersector_name', 'icb_sector_code', 'icb_sector_name']
+    return ['econ_sector', 'business_sector', 'industry_group_sector',
+            'industry_sector', 'activity_sector', 'econ_sector_code',
+            'business_sector_code', 'industry_group_sector_code',
+            'industry_sector_code', 'activity_sector_code']
+
+
 
 if __name__=="__main__":
     # Load the data
-    file_path = 'data/ftse_global_allcap.pkl'
+    file_path = 'data/ftse_world_allcap.pkl'
     with open(file_path, 'rb') as file:
         data = pickle.load(file)
-    
+
     # Basic cleaning
     grp_cols = ['instrument', 'financial_year']
-    revenue_index = data.columns.get_loc("revenue")
-    historic_cols = list(data.columns[revenue_index:])
-    data = clean_raw_data_from_load(data, group_cols=grp_cols, historical_cols=historic_cols)
+    historical_cols = ['mcap', 'revenue', 'ebit', 'ebitda',
+                        'gross_profit', 'net_cash_flow', 'assets',
+                        'current_assets', 'current_liabilities',
+                        'inventories', 'receivables', 'net_ppe',
+                        'cost_of_revenue', 'capex',
+                        'intangible_assets', 'lt_debt']
+    
+    data = clean_raw_data_from_load(data, group_cols=grp_cols, historical_cols=historical_cols)
+
+    # Drop remaining data where we have missings in fundamentals after the fill used in clean_raw_data_from_load
+    data = data.dropna(subset=get_fundamentals_cols(data))
     
     # Add some more variables and subset to a relevant date period
     data['year'] = data['financial_year'].str.replace('FY', '').astype(int)
-    data = data[(data['year'] >= 2016) & (data['year'] <= 2023)]
-    data['cc_classification'] = data['cc'].map(country_classification)
+    data = data[(data['year'] >= 2016) & (data['year'] <= 2022)]
+    
+    # Sort out country mapping
+    data['cc'] = data['cc'].fillna(data['cc_hq']) # use HQ country code if country code is missing
+    data['cc_classification'] = data['cc'].map(country_classification) # HU, KY and BM added on top of original IMF list
+    data = data.drop(columns=['cc_hq'])
     
     # Get emissions in intensity form
-    data = convert_s3_emissions_to_intensities(data)
+    data = convert_emissions_to_intensities(data)
+    
+    # Ensure the data is correctly ordered
+    data.sort_values(by=['instrument', 'year'], ignore_index=True, inplace=True)
     
     # Save
-    data.to_csv('data/ftse_global_allcap_clean.csv', index=False)
+    data.to_csv('data/ftse_world_allcap_clean.csv', index=False)

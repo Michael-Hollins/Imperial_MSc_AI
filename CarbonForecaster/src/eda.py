@@ -84,29 +84,24 @@ def compare_s3_categories_with_total(df, observation_group, tolerance=0.5, verbo
         - The function assumes that individual Scope 3 category columns are contiguous in the DataFrame.
         - It prints detailed statistics about the matching process if verbose is set to True.
     """
-    # Identify columns related to individual Scope 3 categories
-    s3_category_cols = get_s3_cat_cols(df)
-    
-    # Calculate the sum across Scope 3 categories
-    df['sum_across_s3_categories'] = df[s3_category_cols].sum(axis=1)
     
     # Mark the total sum as missing if it is zero
-    df.loc[df['sum_across_s3_categories'] == 0, 'sum_across_s3_categories'] = np.nan
+    df.loc[df['s3_cat_total'] == 0, 's3_cat_total'] = np.nan
     
     # Determine where both are missing, one is missing, or neither is missing
-    both_missing = np.logical_and(np.isnan(df['sum_across_s3_categories']), np.isnan(df['s3_co2e']))
-    one_missing = np.isnan(df['sum_across_s3_categories']) != np.isnan(df['s3_co2e'])
-    total_present_cat_missing = np.logical_and(np.isnan(df['sum_across_s3_categories']), ~np.isnan(df['s3_co2e']))
-    cat_present_total_missing = np.logical_and(~np.isnan(df['sum_across_s3_categories']), np.isnan(df['s3_co2e']))
-    neither_missing = np.logical_and(~np.isnan(df['sum_across_s3_categories']), ~np.isnan(df['s3_co2e']))
+    both_missing = np.logical_and(np.isnan(df['s3_cat_total']), np.isnan(df['s3_co2e']))
+    one_missing = np.isnan(df['s3_cat_total']) != np.isnan(df['s3_co2e'])
+    total_present_cat_missing = np.logical_and(np.isnan(df['s3_cat_total']), ~np.isnan(df['s3_co2e']))
+    cat_present_total_missing = np.logical_and(~np.isnan(df['s3_cat_total']), np.isnan(df['s3_co2e']))
+    neither_missing = np.logical_and(~np.isnan(df['s3_cat_total']), ~np.isnan(df['s3_co2e']))
     
     # Compare the sums and the reported total within the specified tolerance
-    df['discrepancy_perc'] = 100 * abs(df['sum_across_s3_categories'] - df['s3_co2e']) / df['s3_co2e']
+    df['discrepancy_perc'] = 100 * abs(df['s3_cat_total'] - df['s3_co2e']) / df['s3_co2e']
     df['is_sum_equal_to_s3_co2e'] = df['discrepancy_perc'] <= tolerance
 
     # Identify non-matching totals beyond the specified tolerance
     non_matching_totals = df.loc[np.logical_and(df['is_sum_equal_to_s3_co2e'] == False, neither_missing), 
-                                 observation_group + ['sum_across_s3_categories', 's3_co2e', 'discrepancy_perc']]
+                                 observation_group + ['s3_cat_total', 's3_co2e', 'discrepancy_perc']]
     
     # Sort by discrepancy percentage
     non_matching_totals.sort_values(by='discrepancy_perc', ascending=False, inplace=True, ignore_index=True)
@@ -141,7 +136,7 @@ def get_instruments_per_year(df, verbose=True):
     return result
 
 
-def non_missing_count(df, cols_to_check=['revenue', 'ev', 's1_co2e', 's2_co2e', 's3_co2e'], verbose=True):
+def non_missing_count(df, cols_to_check=['revenue', 'mcap', 's1_co2e', 's2_co2e', 's3_co2e'], verbose=True):
     """
     Computes the count of non-missing values for specified columns per year.
 
@@ -207,7 +202,7 @@ def summarise_data_coverage(df, verbose=True):
     not_null_prop = n_instruments.merge(non_missings, on='year').merge(s3_coverage, on='year')
     
     # Columns to calculate proportions
-    columns_to_divide = ['revenue', 'ev', 's1_co2e', 's2_co2e', 's3_co2e', 's3_cat_total']
+    columns_to_divide = ['revenue',  's1_co2e', 's2_co2e', 's3_co2e', 's3_cat_total']
     
     # Calculate proportions
     not_null_prop[columns_to_divide] = not_null_prop[columns_to_divide].div(not_null_prop['n_instruments'], axis=0)
@@ -245,7 +240,7 @@ def get_new_instruments_per_year(df, verbose=True):
     return new_instruments_per_year_df
 
 
-def get_avg_s3_share_by_industry(df, verbose=True):
+def get_avg_s3_share_by_industry(df, industry_col, verbose=True):
     """
     Calculates the average share of Scope 3 CO2e emissions by industry.
 
@@ -268,14 +263,14 @@ def get_avg_s3_share_by_industry(df, verbose=True):
     s3_reporters['carbon_footprint'] = s3_reporters[co2e_cols].sum(axis=1)
     for col in co2e_cols:
         s3_reporters[f'{col}_proportion'] = s3_reporters[col] / s3_reporters['carbon_footprint']
-    df = {x:s3_reporters.loc[s3_reporters['icb_industry_name'] == x, 's3_co2e_proportion'].median() for x in s3_reporters['icb_industry_name'].unique()}
+    df = {x:s3_reporters.loc[s3_reporters[industry_col] == x, 's3_co2e_proportion'].median() for x in s3_reporters[industry_col].unique()}
     result = pd.DataFrame.from_dict(df, orient='index', columns=['s3_prop']).reset_index(names='sector').sort_values(by='s3_prop').reset_index(drop=True)
     if verbose:
         print(result)
     return result
     
 
-def get_s3_prop_by_industry(data, verbose=True):
+def get_s3_prop_by_industry(df, industry_col, verbose=True):
     """
     Calculates the average upstream and downstream Scope 3 CO2e emissions share by industry.
 
@@ -293,27 +288,27 @@ def get_s3_prop_by_industry(data, verbose=True):
         pd.DataFrame: A DataFrame with the average upstream and downstream Scope 3 CO2e emissions share 
                       for each industry, containing columns 'icb_industry_name', 'upstream_share', and 'downstream_share'.
     """
-    s3_category_cols = data.loc[:, 's3_purchased_goods_cat1':'s3_investments_cat15'].columns
-    s3_upstream_cols = data.loc[:, 's3_purchased_goods_cat1':'s3_leased_assets_cat8'].columns
-    s3_downstream_cols = data.loc[:, 's3_distribution_cat9': 's3_investments_cat15'].columns
+    s3_category_cols = df.loc[:, 's3_purchased_goods_cat1':'s3_investments_cat15'].columns
+    s3_upstream_cols = df.loc[:, 's3_purchased_goods_cat1':'s3_leased_assets_cat8'].columns
+    s3_downstream_cols = df.loc[:, 's3_distribution_cat9': 's3_investments_cat15'].columns
     
-    data = data.copy()
+    df = df.copy()
     
-    data['sum_across_s3_categories'] = data[s3_category_cols].sum(axis=1)
-    data['upstream_sum'] = data[s3_upstream_cols].sum(axis=1)
-    data['downstream_sum'] = data[s3_downstream_cols].sum(axis=1)
+    df['sum_across_s3_categories'] = df[s3_category_cols].sum(axis=1)
+    df['upstream_sum'] = df[s3_upstream_cols].sum(axis=1)
+    df['downstream_sum'] = df[s3_downstream_cols].sum(axis=1)
     
-    data.loc[data['sum_across_s3_categories'] == 0, 'sum_across_s3_categories'] = np.nan
-    data['discrepancy_perc'] = 100 * abs(data['sum_across_s3_categories'] - data['s3_co2e']) / data['s3_co2e']
-    data['is_sum_equal_to_s3_co2e'] = data['discrepancy_perc'] <= 0.5
-    data = data[data['is_sum_equal_to_s3_co2e'] == True]
+    df.loc[df['sum_across_s3_categories'] == 0, 'sum_across_s3_categories'] = np.nan
+    df['discrepancy_perc'] = 100 * abs(df['sum_across_s3_categories'] - df['s3_co2e']) / df['s3_co2e']
+    df['is_sum_equal_to_s3_co2e'] = df['discrepancy_perc'] <= 0.5
+    df = df[df['is_sum_equal_to_s3_co2e'] == True]
     
-    data['carbon_footprint'] = data[['s1_co2e', 's2_co2e', 'upstream_sum', 'downstream_sum']].sum(axis=1)
-    data['upstream'] = data['upstream_sum'] / data['carbon_footprint']
-    data['downstream'] = data['downstream_sum'] / data['carbon_footprint']
+    df['carbon_footprint'] = df[['s1_co2e', 's2_co2e', 'upstream_sum', 'downstream_sum']].sum(axis=1)
+    df['upstream'] = df['upstream_sum'] / df['carbon_footprint']
+    df['downstream'] = df['downstream_sum'] / df['carbon_footprint']
     
     # Group by industry and calculate the mean upstream and downstream shares
-    result = data.groupby(['icb_industry_name'])[['upstream', 'downstream']].mean().reset_index()
+    result = df.groupby([industry_col])[['upstream', 'downstream']].mean().reset_index()
     
     if verbose:
         print(result)
@@ -347,7 +342,7 @@ def get_avg_num_s3_cats_reported(df, year_lower=2020, year_upper=2022, verbose=T
     return res
     
 
-def sector_breakdown_for_s3_cat_data(data, verbose=True):
+def sector_breakdown_for_s3_cat_data(df, verbose=True):
     """
     Generate a sector breakdown for Scope 3 category data.
 
@@ -366,30 +361,18 @@ def sector_breakdown_for_s3_cat_data(data, verbose=True):
     pd.DataFrame: A DataFrame containing the counts of unique combinations of industry codes, supersector codes, and sector codes,
                   sorted by 'icb_industry_code', 'icb_supersector_code', and 'icb_sector_code'.
     """
-    s3_cat_cols = data.columns[data.columns.str.contains('^s3_') & (data.columns != 's3_co2e')]
-    data['s3_cat_total'] = data[s3_cat_cols].notna().any(axis=1).astype(int)
-    data = data[(data['year'] >= 2020) & (data['year'] <= 2022) & (data['s3_cat_total'] == True)]
-    counts = data[['icb_industry_code', 'icb_industry_name', 'icb_supersector_code', 'icb_supersector_name', 'icb_sector_code', 'icb_sector_name']].value_counts()
+    sector_cols = get_sector_cols()
+    s3_cat_cols = get_s3_cat_cols(df)
+    df['s3_cat_total'] = df[s3_cat_cols].notna().any(axis=1).astype(int)
+    df = df[df['s1_co2e'].notnull()]
+    counts = df[sector_cols].value_counts()
     counts_df = counts.reset_index(name='count')
-    sorted_counts_df = counts_df.sort_values(by=['icb_industry_code', 'icb_supersector_code', 'icb_sector_code']).reset_index(drop=True)
+    sorted_counts_df = counts_df.sort_values(by=['econ_sector_code', 'business_sector_code', 'industry_group_sector_code', 'industry_sector_code', 'activity_sector_code']).reset_index(drop=True)
     if verbose:
         print(sorted_counts_df)
     return sorted_counts_df
 
         
-        
 if __name__=="__main__":
     # Load the data
-    data = pd.read_csv('data/ftse_global_allcap_clean.csv')
-    
-    # Subset date range
-    df = data[(data['year'] >= 2020) & (data['year'] <= 2022)]
-    
-    
-        
-    
-    
-    
-    
-    
-    
+    data = pd.read_csv('data/ftse_world_allcap_clean.csv')

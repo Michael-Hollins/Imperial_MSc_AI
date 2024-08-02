@@ -20,19 +20,29 @@ fields = {
     'static':[
         'TR.CommonName',
         'TR.CoRPrimaryCountryCode',
-        'TR.ICBIndustryCode',
-        'TR.ICBIndustry',
-        'TR.ICBSupersectorCode',
-        'TR.ICBSupersector',
-        'TR.ICBSectorCode',
-        'TR.ICBSector',
+        'TR.HQCountryCode',
+        'TR.TRBCEconomicSector',
+        'TR.TRBCBusinessSector',
+        'TR.TRBCIndustryGroup',
+        'TR.TRBCIndustry',
+        'TR.TRBCActivity',
+        'TR.TRBCEconSectorCode',
+        'TR.TRBCBusinessSectorCode',
+        'TR.TRBCIndustryGroupCode',
+        'TR.TRBCIndustryCode',
+        'TR.TRBCActivityCode'
         ],
     'business_metrics':[
-        'TR.F.EV', 
         'TR.F.TotRevenue',
         'TR.F.EBIT',
-        'TR.F.EmpFTEEquivPrdEnd',
+        'TR.F.EBITDA',
+        'TR.F.GrossProfIndPropTot',
         'TR.F.NetCashFlowOp',
+        'TR.F.TotAssets',
+        'TR.F.TotCurrAssets',
+        'TR.F.TotCurrLiab',
+        'TR.F.InvntTot',
+        'TR.F.LoansRcvblTot',
         'TR.F.PPENetTot',
         'TR.F.COSTOFOPREV',
         'TR.F.CAPEXTot',
@@ -54,7 +64,10 @@ fields = {
         'TR.CO2DirectScope1',
         'TR.CO2IndirectScope2',
         'TR.CO2IndirectScope3',
-        'TR.CO2EstimationMethod'
+        'TR.Scope1EstMethod',
+        'TR.Scope2EstMethod',
+        'TR.Scope3EstDownstreamMethod',
+        'TR.Scope3EstUpstreamMethod',
         ],
     'scope3upstream':[
         'TR.UpstreamScope3PurchasedGoodsAndServices',
@@ -83,20 +96,32 @@ col_mapping = {
     'Financial Period Absolute': 'financial_year',
     'Company Common Name': 'firm_name',
     'ISO2 Code of Primary Country of Risk': 'cc',
-    'ICB Industry code': 'icb_industry_code',
-    'ICB Industry name': 'icb_industry_name',
-    'ICB Supersector code': 'icb_supersector_code',
-    'ICB Supersector name': 'icb_supersector_name',
-    'ICB Sector code': 'icb_sector_code',
-    'ICB Sector name': 'icb_sector_name',
+    'Country ISO Code of Headquarters': 'cc_hq',
+    'TRBC Economic Sector Name': 'econ_sector',
+    'TRBC Business Sector Name': 'business_sector',
+    'TRBC Industry Group Name': 'industry_group_sector',
+    'TRBC Industry Name': 'industry_sector',
+    'TRBC Activity Name': 'activity_sector',
+    'TRBC Economic Sector Code': 'econ_sector_code',
+    'TRBC Business Sector Code': 'business_sector_code',
+    'TRBC Industry Group Code': 'industry_group_sector_code',
+    'TRBC Industry Code': 'industry_sector_code',
+    'TRBC Activity Code': 'activity_sector_code',
     'Company Market Cap': 'mcap',
     'Revenue from Business Activities - Total': 'revenue',
-    'Enterprise Value' :'ev',
-    'Employees - Full-Time/Full-Time Equivalents - Period End': 'employees',
+    # 'Number of Employees': 'employees',
     'Earnings before Interest & Taxes (EBIT)': 'ebit',
+    'Earnings before Interest Taxes Depreciation & Amortization': 'ebitda',
+    'Gross Profit - Industrials/Property - Total': 'gross_profit',
     'Net Cash Flow from Operating Activities': 'net_cash_flow',
+    'Total Assets': 'assets',
+    'Total Current Assets': 'current_assets',
+    'Total Current Liabilities': 'current_liabilities',
+    'Inventories - Total': 'inventories',
+    'Loans & Receivables - Total': 'receivables',
     'Property Plant & Equipment - Net - Total': 'net_ppe',
     'Cost of Operating Revenue': 'cost_of_revenue',
+    'Capital Expenditures - Total': 'capex',
     'Intangible Assets - Total - Net': 'intangible_assets',
     'Debt - Long-Term - Total': 'lt_debt',
     'Crude Oil - Production - Total': 'prod_crude_oil',
@@ -109,7 +134,10 @@ col_mapping = {
     'CO2 Equivalent Emissions Direct, Scope 1': 's1_co2e',
     'CO2 Equivalent Emissions Indirect, Scope 2': 's2_co2e',
     'CO2 Equivalent Emissions Indirect, Scope 3': 's3_co2e',
-    'CO2 Estimation Method': 'co2e_method',
+    'Scope 1 Estimated Method': 's1_co2e_method',
+    'Scope 2 Estimated Method': 's2_co2e_method',
+    'Scope3 Est Downstream Method': 's3_downstream_co2e_method',
+    'Scope3 Est Upstream Method': 's3_upstream_co2e_method',
     'Upstream scope 3 emissions Purchased goods and services': 's3_purchased_goods_cat1',
     'Upstream scope 3 emissions Capital goods': 's3_capital_goods_cat2',
     'Upstream scope 3 emissions Fuel- and Energy-related Activities': 's3_fuel_energy_cat3',
@@ -160,7 +188,7 @@ def chunk_list(lst, chunk_size):
 
 
 def get_ftse_all_cap_universe():
-    ftse_all_cap = pd.read_csv('data/FTSE_Global_AllCap_2022.csv', usecols=['Constituent RIC']).dropna().drop_duplicates().values.tolist()
+    ftse_all_cap = pd.read_csv('data/FTSE_AllWorld_20221231.csv', usecols=['Constituent RIC']).dropna().drop_duplicates().values.tolist()
     ftse_all_cap = [item[0] for item in ftse_all_cap] 
     return ftse_all_cap
 
@@ -187,20 +215,45 @@ def get_non_fundamentals(universe, fields, financial_years, parameters):
     
     data = list(itertools.product(universe, financial_years))
     data = pd.DataFrame(data, columns = ['Instrument', 'Financial Period Absolute'])
+    year_end_dates = pd.to_datetime([str(year) + '-12-31' for year in range(2015, 2025, 1)])
+
+    def find_closest_date(date, date_list):
+        closest_date = date_list[np.argmin(np.abs(date_list - date))]
+        return closest_date
     
-    
+    def find_previous_year_end(date, date_list):
+        # Filter the list to only include dates before the current date
+        previous_dates = date_list[date_list < date]
+        # If there are no earlier dates, return the earliest available date
+        if len(previous_dates) == 0:
+            return date_list.min()
+        # Return the maximum date from the filtered list (i.e., the most recent previous year-end)
+        return previous_dates.max()
+
     for field in fields:
         rd.open_session()
-        flds = [field, field + '.calcdate'] # [field_name, field_name.fperiod]
+        if field == 'TR.CompanyMarketCap':
+            flds = ['TR.CompanyMarketCap', 'TR.CompanyMarketCap.calcdate'] 
+        elif field == 'TR.CompanyNumEmploy':
+            flds = ['TR.CompanyNumEmploy', 'TR.CompanyNumEmployDate']
         print(f"Loading data for {field}")
         historical_data = list()
-        for chunk in chunk_list(lst=universe, chunk_size=500):
+        for chunk in chunk_list(lst=universe, chunk_size=1000):
             temp = rd.get_data(universe=chunk, fields=flds, parameters=parameters)
             historical_data.append(temp)
         historical_data = pd.concat(historical_data, ignore_index=True)
-        historical_data.rename(columns={'Calc Date': 'Financial Period Absolute'}, inplace=True)
+        historical_data.columns.values[2] = 'Financial Period Absolute'
         historical_data['Financial Period Absolute'] = pd.to_datetime(historical_data['Financial Period Absolute'])
         historical_data = historical_data.dropna()
+        # historical_data['year'] = historical_data['Financial Period Absolute'].dt.year
+        # If the years are unique, i.e. one observation per year, keep it, otherwise, round to nearest year
+        def process_group(group):
+            if len(group['Financial Period Absolute'].dt.year.unique()) == len(group['Financial Period Absolute'].dt.year):
+                group['Financial Period Absolute'] = group['Financial Period Absolute']
+            else:
+                group['Financial Period Absolute'] = group['Financial Period Absolute'].apply(lambda x: find_previous_year_end(x, year_end_dates))
+            return group
+        historical_data = historical_data.groupby('Instrument', group_keys=False).apply(process_group)
         historical_data['Financial Period Absolute'] = historical_data['Financial Period Absolute'].dt.year.astype(int)
         historical_data['Financial Period Absolute'] = 'FY' + historical_data['Financial Period Absolute'].astype(str)
         data = data.merge(historical_data, on = ['Instrument', 'Financial Period Absolute'], how = 'outer')
@@ -220,7 +273,7 @@ def save_raw_data_from_api(file_dir, universe, fields, financial_years, paramete
     
     # Load the static data e.g. company name, HQ country, sector
     static_data = list()
-    for chunk in chunk_list(lst=universe, chunk_size=500):
+    for chunk in chunk_list(lst=universe, chunk_size=1000):
         data = rd.get_data(universe=chunk, fields=static_fields)
         static_data.append(data)
     static_data = pd.concat(static_data, ignore_index=True)
@@ -231,16 +284,16 @@ def save_raw_data_from_api(file_dir, universe, fields, financial_years, paramete
     rd.close_session()
     
     # Get market cap data
-    non_fundamentals = get_non_fundamentals(universe=universe, fields = ['TR.CompanyMarketCap'], financial_years=financial_years, parameters=parameters)
+    non_fundamentals = get_non_fundamentals(universe=universe, fields = ['TR.CompanyMarketCap'], financial_years=financial_years, parameters=parameters) # 'TR.CompanyNumEmploy'
     data = data.merge(non_fundamentals, on = ['Instrument', 'Financial Period Absolute'], how = 'outer')
     
     # Load the historical variables one at a time, and join on using their fperiod
     for field in historical_fields:
         rd.open_session()
-        flds = [field, field + '.fperiod'] # [field_name, field_name.fperiod]
+        flds = [field, field + '.fperiod'] 
         print(f"Loading data for {field}")
         historical_data = list()
-        for chunk in chunk_list(lst=universe, chunk_size=500):
+        for chunk in chunk_list(lst=universe, chunk_size=1000):
             temp = rd.get_data(universe=chunk, fields=flds, parameters=parameters)
             historical_data.append(temp)
         historical_data = pd.concat(historical_data, ignore_index=True)
@@ -259,9 +312,9 @@ def save_raw_data_from_api(file_dir, universe, fields, financial_years, paramete
     
 if __name__=="__main__":
     universe = get_ftse_all_cap_universe()
-    financial_years = ['FY' + str(i) for i in range(2016, 2024, 1)]
-    params = {"SDate" :0 , "EDate" :-8, "FRQ":"FY", "Curn": "USD"}
-    save_raw_data_from_api('data/ftse_global_allcap.pkl',
+    financial_years = ['FY' + str(i) for i in range(2015, 2024, 1)]
+    params = {"SDate" :0 , "EDate" :-9, "FRQ":"FY", "Curn": "USD"}
+    save_raw_data_from_api('data/ftse_world_allcap.pkl',
                            universe=universe,
                            fields=fields,
                            financial_years=financial_years,

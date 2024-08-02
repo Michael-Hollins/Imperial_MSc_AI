@@ -204,3 +204,21 @@ if REFRESH_PLOTS:
     plt.close()
 
 #######################################################
+if REFRESH_PLOTS:
+    data = pd.read_csv('data/ftse_world_allcap_clean.csv')
+    proportion_non_null_by_year = data.groupby('year')[['s1_co2e', 's2_co2e', 's3_co2e', 's3_upstream', 's3_downstream']].apply(lambda x: x.notnull().mean()).reset_index()
+    proportion_non_null_by_year = proportion_non_null_by_year.melt(id_vars='year', var_name='scope', value_name='value')
+
+    fig, ax = plt.subplots(figsize=(plot_width_inch, plot_height_inch), dpi=dpi)
+    sns.lineplot(data=proportion_non_null_by_year, x='year', y='value', hue='scope', marker='o')
+    plt.xticks(fontsize=7)
+    plt.yticks(fontsize=7)
+    plt.ylim(-0.1, 1)  
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: '{:.0%}'.format(y)))
+    plt.legend(title='', loc='upper left', fontsize='xx-small', frameon=False)
+    plot_remove_labels(ax)
+    plt.tight_layout()
+    fig.savefig(os.path.join(figure_path, 'scope_disclosure_by_year.png'), dpi=dpi)
+    plt.close()
+    
+#######################################################
