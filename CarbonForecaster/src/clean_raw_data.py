@@ -539,7 +539,6 @@ def get_sector_cols():
             'industry_sector_code', 'activity_sector_code']
 
 
-
 if __name__=="__main__":
     # Load the data
     file_path = 'data/ftse_world_allcap.pkl'
@@ -574,6 +573,9 @@ if __name__=="__main__":
     
     # Ensure the data is correctly ordered
     data.sort_values(by=['instrument', 'year'], ignore_index=True, inplace=True)
+    
+    # Drop firms in this sector because there are so few
+    data = data[data['econ_sector'] != 'Academic & Educational Services']
     
     # Save
     data.to_csv('data/ftse_world_allcap_clean.csv', index=False)
