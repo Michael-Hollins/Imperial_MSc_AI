@@ -471,6 +471,16 @@ def clean_raw_data_from_load(df, group_cols, historical_cols):
     return df
 
 
+def clean_raw_data_from_load_keep_missings(df, group_cols, historical_cols):
+    df = standardise_missing_values(df)
+    df = mask_non_reported_co2e(df)
+    df = create_new_emissions_aggregates(df)
+    df = consolidate_observations(df, group_cols=group_cols, historical_cols=historical_cols)
+    df = drop_rows_with_all_missings(df, fields_to_check=historical_cols)
+    df[historical_cols] = df[historical_cols].replace(0, np.nan) # set values of zero to missing
+    df = drop_dual_listing_duplicates(df)
+    return df
+
 def convert_emissions_to_intensities(df):
     """
     Convert Scope 3 emissions to intensities and create new columns.
@@ -545,6 +555,8 @@ if __name__=="__main__":
     with open(file_path, 'rb') as file:
         data = pickle.load(file)
 
+    xgb_dataset = False
+
     # Basic cleaning
     grp_cols = ['instrument', 'financial_year']
     historical_cols = ['mcap', 'revenue', 'ebit', 'ebitda',
@@ -554,10 +566,12 @@ if __name__=="__main__":
                         'cost_of_revenue', 'capex',
                         'intangible_assets', 'lt_debt']
     
-    data = clean_raw_data_from_load(data, group_cols=grp_cols, historical_cols=historical_cols)
-
-    # Drop remaining data where we have missings in fundamentals after the fill used in clean_raw_data_from_load
-    data = data.dropna(subset=get_fundamentals_cols(data))
+    if xgb_dataset:
+        data = clean_raw_data_from_load_keep_missings(data, group_cols=grp_cols, historical_cols=historical_cols)
+    else:
+        data = clean_raw_data_from_load(data, group_cols=grp_cols, historical_cols=historical_cols)
+        # Drop remaining data where we have missings in fundamentals after the fill used in clean_raw_data_from_load
+        data = data.dropna(subset=get_fundamentals_cols(data))
     
     # Add some more variables and subset to a relevant date period
     data['year'] = data['financial_year'].str.replace('FY', '').astype(int)
@@ -578,4 +592,7 @@ if __name__=="__main__":
     data = data[data['econ_sector'] != 'Academic & Educational Services']
     
     # Save
-    data.to_csv('data/ftse_world_allcap_clean.csv', index=False)
+    if xgb_dataset:
+        data.to_csv('data/ftse_world_allcap_clean_xgboost.csv', index=False)
+    else:
+        data.to_csv('data/ftse_world_allcap_clean.csv', index=False)

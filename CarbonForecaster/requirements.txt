@@ -11,3 +11,4 @@ pytorch-forecasting==1.0.0
 refinitiv.data==1.6.1
 seaborn==0.13.2
 linearmodels==6.0
+xgboost==2.1.1
