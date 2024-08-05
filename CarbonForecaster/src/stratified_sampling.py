@@ -185,7 +185,6 @@ def get_peer_groups_and_folds(df, target_variable, sector_features, minimum_firm
     data_with_folds = assign_folds_within_peer_groups(peer_groups_df, peer_group_col='peer_group', k=k_folds, random_state=seed_num)
     df = df.merge(data_with_folds, on='instrument', how='left')
     
-    firms_per_fold = df.drop_duplicates(subset='instrument')['fold'].value_counts().sort_index()
     observations_per_fold = df['fold'].value_counts().sort_index()
     
     if verbose:
