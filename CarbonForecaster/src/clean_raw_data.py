@@ -555,7 +555,7 @@ if __name__=="__main__":
     with open(file_path, 'rb') as file:
         data = pickle.load(file)
 
-    xgb_dataset = False
+    xgb_dataset = True
 
     # Basic cleaning
     grp_cols = ['instrument', 'financial_year']

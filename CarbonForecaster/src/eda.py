@@ -372,7 +372,46 @@ def sector_breakdown_for_s3_cat_data(df, verbose=True):
         print(sorted_counts_df)
     return sorted_counts_df
 
+def describe_data(df):
+    numeric_types = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64','uint8']
+    dtypes = df.dtypes
+    newdf = df.select_dtypes(include=numeric_types)
+    total = df.isnull().count()
+    missing = df.isnull().sum()
+    available = total-missing
+    missing_percent = missing/total
+    unique = df.nunique()
+    min_value = newdf.min()
+    max_value = newdf.max()
+    mean_value = newdf.mean()
+    median_value = newdf.median()
+    quantile_95 = newdf.quantile(0.95)
+    quantile_5 = newdf.quantile(0.05)
+    quantile_25 = newdf.quantile(0.25)
+    quantile_75 = newdf.quantile(0.75)
+    quantile_10 = newdf.quantile(0.10)
+    quantile_90 = newdf.quantile(0.90)
+    std = newdf.std()
+    kurtosis = newdf.kurtosis()
+    skew = newdf.skew()
+    
+    Summary = pd.concat([dtypes,total,missing,available,missing_percent,unique, min_value,\
+						 max_value,mean_value,median_value,std,kurtosis,skew,\
+						 quantile_5,quantile_95,\
+						 quantile_25,quantile_75,\
+						 quantile_10, quantile_90,\
+						 ],axis=1,keys=["Types","Total","Missing","Available",\
+						 "Missing_Percent","Unique","Min","Max","Mean","Median","Std Error"\
+						 ,"Kurtosis","Skewness","Quantile5","Quantile95",\
+						 "Quantile25","Quantile75","Quantile10","Quantile90"])
+    Summary.reset_index(level=0, inplace=True)
+    return (Summary)
+
         
 if __name__=="__main__":
     # Load the data
     data = pd.read_csv('data/ftse_world_allcap_clean.csv')
+    
+    summary = describe_data(data)
+    summary.to_csv('data/summary.csv', index=False)
+    

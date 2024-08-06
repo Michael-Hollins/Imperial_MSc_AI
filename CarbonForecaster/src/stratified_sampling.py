@@ -179,13 +179,26 @@ def get_peer_groups_and_folds(df, target_variable, sector_features, minimum_firm
     Returns:
         pd.DataFrame: The original DataFrame with additional columns for 'peer_group' and 'fold', indicating the assigned peer group and fold for each instrument.
     """
+    # Filter out rows where the target variable is missing
     df = df[df[target_variable].notnull()]
+
+    # Determine the minimum number of firms required per peer group
     minimum_firm_count = min_firms_per_peer_group(folds=k_folds, min_firms_per_fold=minimum_firms_per_fold)
-    peer_groups_df = build_peer_group(data=df, sector_columns=sector_features, minimum_firm_count=minimum_firm_count)
-    data_with_folds = assign_folds_within_peer_groups(peer_groups_df, peer_group_col='peer_group', k=k_folds, random_state=seed_num)
-    df = df.merge(data_with_folds, on='instrument', how='left')
     
-    observations_per_fold = df['fold'].value_counts().sort_index()
+    # Check if this number exceeds the number of unique firms in the broadest sector level
+    min_firms_in_broadest_sector = df.groupby(sector_features[0])['instrument'].nunique().min()
+    if minimum_firm_count > min_firms_in_broadest_sector:
+        raise ValueError(f"The required minimum number of firms per peer group ({minimum_firm_count}) exceeds the number of unique firms "
+                         f"in the broadest sector level ({min_firms_in_broadest_sector}). Adjust the number of folds or minimum firms per fold.")
+
+    # Build peer groups
+    peer_groups_df = build_peer_group(data=df, sector_columns=sector_features, minimum_firm_count=minimum_firm_count)
+
+    # Assign folds within each peer group
+    data_with_folds = assign_folds_within_peer_groups(peer_groups_df, peer_group_col='peer_group', k=k_folds, random_state=seed_num)
+    
+    # Merge the assigned peer groups and folds back into the original DataFrame
+    df = df.merge(data_with_folds, on='instrument', how='left')
     
     if verbose:
         # Firms and observations per fold
@@ -207,4 +220,5 @@ def get_peer_groups_and_folds(df, target_variable, sector_features, minimum_firm
         
         print(f"\nPeer Group Summary Split by Fold:")
         print(peer_group_fold_summary.pivot(index='peer_group', columns='fold', values=['Unique_Firms', 'Total_Observations']))
+    
     return df
