@@ -43,6 +43,7 @@ fields = {
         'TR.F.TotCurrLiab',
         'TR.F.InvntTot',
         'TR.F.LoansRcvblTot',
+        'TR.F.PPEGrossTot',
         'TR.F.PPENetTot',
         'TR.F.COSTOFOPREV',
         'TR.F.CAPEXTot',
@@ -119,6 +120,7 @@ col_mapping = {
     'Total Current Liabilities': 'current_liabilities',
     'Inventories - Total': 'inventories',
     'Loans & Receivables - Total': 'receivables',
+    'Property Plant & Equipment - Gross - Total': 'gross_ppe',
     'Property Plant & Equipment - Net - Total': 'net_ppe',
     'Cost of Operating Revenue': 'cost_of_revenue',
     'Capital Expenditures - Total': 'capex',
@@ -215,7 +217,7 @@ def get_non_fundamentals(universe, fields, financial_years, parameters):
     
     data = list(itertools.product(universe, financial_years))
     data = pd.DataFrame(data, columns = ['Instrument', 'Financial Period Absolute'])
-    year_end_dates = pd.to_datetime([str(year) + '-12-31' for year in range(2015, 2025, 1)])
+    year_end_dates = pd.to_datetime([str(year) + '-12-31' for year in range(2010, 2025, 1)])
 
     def find_closest_date(date, date_list):
         closest_date = date_list[np.argmin(np.abs(date_list - date))]
@@ -238,7 +240,7 @@ def get_non_fundamentals(universe, fields, financial_years, parameters):
             flds = ['TR.CompanyNumEmploy', 'TR.CompanyNumEmployDate']
         print(f"Loading data for {field}")
         historical_data = list()
-        for chunk in chunk_list(lst=universe, chunk_size=1000):
+        for chunk in chunk_list(lst=universe, chunk_size=500):
             temp = rd.get_data(universe=chunk, fields=flds, parameters=parameters)
             historical_data.append(temp)
         historical_data = pd.concat(historical_data, ignore_index=True)
@@ -273,7 +275,7 @@ def save_raw_data_from_api(file_dir, universe, fields, financial_years, paramete
     
     # Load the static data e.g. company name, HQ country, sector
     static_data = list()
-    for chunk in chunk_list(lst=universe, chunk_size=1000):
+    for chunk in chunk_list(lst=universe, chunk_size=500):
         data = rd.get_data(universe=chunk, fields=static_fields)
         static_data.append(data)
     static_data = pd.concat(static_data, ignore_index=True)
@@ -293,7 +295,7 @@ def save_raw_data_from_api(file_dir, universe, fields, financial_years, paramete
         flds = [field, field + '.fperiod'] 
         print(f"Loading data for {field}")
         historical_data = list()
-        for chunk in chunk_list(lst=universe, chunk_size=1000):
+        for chunk in chunk_list(lst=universe, chunk_size=500):
             temp = rd.get_data(universe=chunk, fields=flds, parameters=parameters)
             historical_data.append(temp)
         historical_data = pd.concat(historical_data, ignore_index=True)
@@ -312,10 +314,11 @@ def save_raw_data_from_api(file_dir, universe, fields, financial_years, paramete
     
 if __name__=="__main__":
     universe = get_ftse_all_cap_universe()
-    financial_years = ['FY' + str(i) for i in range(2015, 2024, 1)]
-    params = {"SDate" :0 , "EDate" :-9, "FRQ":"FY", "Curn": "USD"}
+    financial_years = ['FY' + str(i) for i in range(2010, 2024, 1)]
+    params = {"SDate" :0 , "EDate" :-14, "FRQ":"FY", "Curn": "USD"}
     save_raw_data_from_api('data/ftse_world_allcap.pkl',
                            universe=universe,
                            fields=fields,
                            financial_years=financial_years,
                            parameters=params)
+    

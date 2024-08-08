@@ -1,10 +1,8 @@
-
 import numpy as np
 import pandas as pd
-from load_raw_data import load_from_excel
-from load_raw_data import col_mapping
 import pickle
 import re
+from scipy.stats.mstats import winsorize
 
 # Define country categories, source: https://www.imf.org/en/Publications/WEO/weo-database/2023/April/groups-and-aggregates
 country_classification = {
@@ -185,24 +183,6 @@ country_classification = {
 }
 
 
-def standardise_missing_values(df):
-    """
-    Standardises missing values in a DataFrame.
-
-    This function replaces any form of missing values in the DataFrame with `np.nan`.
-    It standardizes missing values represented as empty strings or other NA types.
-
-    Args:
-        df (pd.DataFrame): The input DataFrame to be standardized.
-
-    Returns:
-        pd.DataFrame: The DataFrame with standardized missing values.
-    """
-    df = df.applymap(lambda x: np.nan if pd.isna(x) else x)
-    df.replace('', np.nan, inplace=True)
-    return df
-
-
 def get_s3_cat_cols(df):
     """
     This function searches through the column names of a given DataFrame and 
@@ -220,12 +200,122 @@ def get_s3_cat_cols(df):
     return s3_cat_cols
 
 
-def change_zeros_to_missing(df, cols):
-    df[cols] = df[cols].replace(0, np.nan)
+def get_absolute_emissions_cols(df):
+    return ['s1_co2e', 's2_co2e', 's1_and_s2_co2e', 's3_co2e'] + get_s3_cat_cols(df=df) + ['s3_upstream', 's3_downstream', 's3_cat_total']
+
+
+def get_fundamentals_cols(df):
+    mcap_index = df.columns.get_loc("mcap")
+    ltdebt_index = df.columns.get_loc("lt_debt")
+    fundamental_cols = list(df.columns[mcap_index:ltdebt_index + 1])
+    return fundamental_cols
+
+
+def get_sector_cols():
+    return ['econ_sector', 'business_sector', 'industry_group_sector',
+            'industry_sector', 'activity_sector', 'econ_sector_code',
+            'business_sector_code', 'industry_group_sector_code',
+            'industry_sector_code', 'activity_sector_code']
+
+
+def standardise_missing_values(df, verbose=False):
+    """
+    Standardises missing values in a DataFrame.
+
+    This function replaces any form of missing values in the DataFrame with `np.nan`.
+    It standardizes missing values represented as empty strings or other NA types.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame to be standardized.
+
+    Returns:
+        pd.DataFrame: The DataFrame with standardized missing values.
+    """
+    missing_before = df.isna().sum().sum()
+    
+    df = df.applymap(lambda x: np.nan if pd.isna(x) else x)
+    df.replace('', np.nan, inplace=True)
+    
+    missing_after = df.isna().sum().sum()
+    changed_count = missing_after - missing_before
+    if verbose:
+        print("\nSTANDARDISING MISSING VALUES")
+        print(f"Number of data points changed to np.nan: {changed_count}")
     return df
 
 
-def mask_non_reported_co2e(df):
+def create_new_emissions_aggregates(df, verbose=False):
+    """
+    Create new emissions aggregates and analyze the proportions of null, zero, and other values in emissions data.
+
+    This function performs the following tasks:
+    1. Analyzes the proportions of nulls, zeros, and other values (non-null, non-zero) in the specified emissions columns.
+    2. Creates new emissions aggregate columns by combining various upstream, downstream, and overall emissions data.
+    3. Optionally prints a wide-format table summarizing the proportions of nulls, zeros, and other values in the emissions data if `verbose` is set to True.
+    4. Replaces zero values in the emissions columns with missing values (`np.nan`).
+
+    Args:
+        df (pandas.DataFrame): The input DataFrame containing emissions data.
+        verbose (bool, optional): If True, prints the proportion of nulls, zeros, and other values for each emissions column. Default is False.
+
+    Returns:
+        pandas.DataFrame: The DataFrame with new emissions aggregates and with zero values replaced by missing values in specified columns.
+    """
+    # Function to calculate proportions of nulls, zeros, and non-null values
+    def calculate_proportions(column):
+        total_count = len(df)
+        null_count = df[column].isna().sum()
+        zero_count = (df[column] == 0).sum()
+        non_null_count = total_count - null_count
+        other_count = non_null_count - zero_count
+
+        null_proportion = null_count / total_count
+        zero_proportion = zero_count / total_count
+        other_proportion = other_count / total_count
+
+        return [null_proportion, zero_proportion, other_proportion]
+       
+    upstream_cols = ['s3_purchased_goods_cat1', 's3_capital_goods_cat2',
+        's3_fuel_energy_cat3', 's3_transportation_cat4', 's3_waste_cat5',
+        's3_business_travel_cat6', 's3_employee_commuting_cat7',
+        's3_leased_assets_cat8']
+    downstream_cols = ['s3_distribution_cat9',
+        's3_processing_products_cat10', 's3_use_of_sold_cat11',
+        's3_EOL_treatment_cat12', 's3_leased_assets_cat13',
+        's3_franchises_cat14', 's3_investments_cat15']
+    emissions_columns = ['s1_co2e', 's2_co2e', 's3_co2e'] + upstream_cols + downstream_cols
+    
+    proportions_df = pd.DataFrame(columns=emissions_columns, index=['Null', 'Zero', 'Other'])
+    if verbose:
+        print('\nCREATING NEW EMISSIONS AGGREGATES, SETTING ZEROS TO MISSING')
+        # Calculate and store the proportions for each emissions column
+        for col in emissions_columns:
+            proportions_df[col] = calculate_proportions(col)
+
+        # Print the proportions DataFrame
+        print("\nProportions of Nulls, Zeros, and Other Values:")
+        print(proportions_df.applymap(lambda x: f"{x:.2%}"))
+
+    # Create some additional emissions aggregates to inspect
+    df['s1_and_s2_co2e'] = df['s1_co2e'].fillna(0) + df['s2_co2e'].fillna(0)
+    df['s3_upstream'] = df[upstream_cols].sum(axis=1, skipna=True)
+    df['s3_downstream'] = df[downstream_cols].sum(axis=1, skipna=True)
+    df['s3_cat_total'] = df['s3_upstream'].fillna(0) + df['s3_downstream'].fillna(0)
+    
+    # Add on the aggregates
+    emissions_columns = emissions_columns + ['s1_and_s2_co2e', 's3_upstream', 's3_downstream', 's3_cat_total']
+    
+    def change_zeros_to_missing(df, cols):
+        df[cols] = df[cols].replace(0, np.nan)
+        return df
+    
+    # Replace zeros to missings as there are so few zeros
+    df = change_zeros_to_missing(df, cols=emissions_columns)
+    
+    return df
+
+
+def mask_non_reported_co2e(df, verbose=False):
     """
     Masks CO2e values where the co2e method is not 'Reported'.
 
@@ -238,44 +328,43 @@ def mask_non_reported_co2e(df):
     Returns:
         pandas.DataFrame: The DataFrame with masked CO2e values where the c02e method is not 'Reported'.
     """
-    # Document what values are reported in these fields
+    def print_proportions(method_col, df):
+        value_counts = df[method_col].value_counts(dropna=False)
+        total_count = len(df)
+        reported_count = value_counts.get('Reported_value', 0)
+        missing_count = total_count - reported_count
+        reported_proportion = reported_count / total_count
+        missing_proportion = missing_count / total_count
+
+        print(f"\nValue counts for {method_col}:")
+        print(value_counts)
+        print(f"Proportion 'Reported_value': {reported_proportion:.0%}")
+        print(f"Proportion set to missing: {missing_proportion:.0%}")
+        
+    # Category columns
     s3_cat_cols = get_s3_cat_cols(df)
     s3_upstream_cols = s3_cat_cols[:8]
     s3_downstream_cols = s3_cat_cols[8:]
-    df.loc[df['s1_co2e_method'] != 'Reported_value', 's1_co2e'] = np.nan
-    df.loc[df['s2_co2e_method'] != 'Reported_value', 's2_co2e'] = np.nan
-    df.loc[df['s3_upstream_co2e_method'] != 'Reported_value', s3_upstream_cols] = np.nan
-    df.loc[df['s3_downstream_co2e_method'] != 'Reported_value', s3_downstream_cols] = np.nan
+    method_columns = ['s1_co2e_method', 's2_co2e_method', 's3_upstream_co2e_method', 's3_downstream_co2e_method']
+    
+    # Document and mask the CO2e values based on the method columns
+    for method_col in method_columns:
+        if verbose:
+            print("\nMASKING C02 DATA POINTS THAT AREN'T REPORTED")
+            print_proportions(method_col, df)
+
+        if method_col == 's3_upstream_co2e_method':
+            df.loc[df[method_col] != 'Reported_value', s3_upstream_cols + ['s3_cat_total']] = np.nan
+        elif method_col == 's3_downstream_co2e_method':
+            df.loc[df[method_col] != 'Reported_value', s3_downstream_cols + ['s3_cat_total']] = np.nan
+        elif method_col == 's1_co2e_method':
+            df.loc[df[method_col] != 'Reported_value', ['s1_co2e', 's1_and_s2_co2e']] = np.nan
+        elif method_col == 's2_co2e_method':
+            df.loc[df[method_col] != 'Reported_value', ['s2_co2e', 's1_and_s2_co2e']] = np.nan
+
     # TODO: Think about how to mask s3_co2e
     return df
     
-
-def create_new_emissions_aggregates(df):
-    # Create some additional emissions aggregates to inspect
-    df['s1_and_s2_co2e'] = df['s1_co2e'].fillna(0) + df['s2_co2e'].fillna(0)
-    upstream_cols = ['s3_purchased_goods_cat1', 's3_capital_goods_cat2',
-        's3_fuel_energy_cat3', 's3_transportation_cat4', 's3_waste_cat5',
-        's3_business_travel_cat6', 's3_employee_commuting_cat7',
-        's3_leased_assets_cat8']
-    downstream_cols = ['s3_distribution_cat9',
-        's3_processing_products_cat10', 's3_use_of_sold_cat11',
-        's3_EOL_treatment_cat12', 's3_leased_assets_cat13',
-        's3_franchises_cat14', 's3_investments_cat15']
-    df['s3_upstream'] = df[upstream_cols].sum(axis=1, skipna=True)
-    df['s3_downstream'] = df[downstream_cols].sum(axis=1, skipna=True)
-    df['s3_cat_total'] = df['s3_upstream'].fillna(0) + df['s3_downstream'].fillna(0)
-    
-    # Replace zeros from the aggregates to missings
-    df = change_zeros_to_missing(df, cols=['s1_and_s2_co2e', 's3_upstream', 's3_downstream', 's3_cat_total'])
-    
-    # Let's also replace the very few zeros in the aggregate scope columns to missings
-    df = change_zeros_to_missing(df, cols=['s1_co2e', 's2_co2e', 's3_co2e'])
-    return df
-
-
-def get_absolute_emissions_cols(df):
-    return ['s1_co2e', 's2_co2e', 's1_and_s2_co2e', 's3_co2e'] + get_s3_cat_cols(df=df) + ['s3_upstream', 's3_downstream', 's3_cat_total']
-
 
 def consolidation_is_possible(df, group_cols, historical_cols):
     """
@@ -357,7 +446,7 @@ def consolidate_group(group):
     return group.ffill().bfill().iloc[-1]
 
 
-def consolidate_observations(df, group_cols, historical_cols):
+def consolidate_observations(df, group_cols, historical_cols, verbose=False):
     """
     Consolidates the observations in the DataFrame if consolidation is possible.
 
@@ -373,10 +462,21 @@ def consolidate_observations(df, group_cols, historical_cols):
         pd.DataFrame: The consolidated DataFrame if consolidation is possible.
         If consolidation is not possible, returns None and prints the conflicting groups.
     """
+    consolidation_not_needed = df.groupby(group_cols).size().all() == 1
+    if consolidation_not_needed:
+        if verbose:
+            print('\nCONSOLIDATING ANY INSTANCES OF MULTIPLE FIRM-YEAR OBSERVATIONS')
+            print('Consolidation not required.')
+        return df
+    
     consolidation, df = consolidation_is_possible(df=df, group_cols=group_cols, historical_cols=historical_cols)
     if consolidation:
+        pre_consolidation_length = len(df)
         df_consolidated = df.groupby(group_cols).apply(consolidate_group).reset_index(drop=True)
-        print("Consolidation successful")
+        post_consolidation_length = len(df_consolidated)
+        if verbose:
+            print('\nCONSOLIDATING ANY INSTANCES OF MULTIPLE FIRM-YEAR OBSERVATIONS')
+            print(f"Consolidation successful, removing {pre_consolidation_length - post_consolidation_length} observations.")
         return df_consolidated
     else:
         print("Consolidation not possible")
@@ -403,34 +503,73 @@ def drop_rows_with_all_missings(df, fields_to_check, verbose=False):
     n2 = len(df)
     
     if verbose:
+        print('\nDROPPING OBSERVATIONS WITH NO FUNDAMENTALS DATA')
         print(f"{n1 - n2} observations dropped because all historical data was missing.")
     
     df = df.reset_index(drop=True)
     return df
 
 
-def remove_fundamentals_with_low_coverage(df, verbose=False):
-    cols_to_remove = ['gross_profit', 'current_assets', 'current_liabilities', 'inventories', 'cost_of_revenue']
+def remove_fundamentals_with_low_coverage(df, cols_to_check, threshold=0.1, verbose=False):
+    """
+    Removes columns from the DataFrame if the proportion of null values exceeds a specified threshold.
+
+    Args:
+        df (pandas.DataFrame): The input DataFrame.
+        cols_to_check (list of str): The list of columns to check for null proportions.
+        threshold (float): The maximum allowable proportion of null values in a column before it is removed. Default is 0.1 (10%).
+        verbose (bool): Whether to print outcome of removing low coverage columns.
+
+    Returns:
+        pandas.DataFrame: The DataFrame with columns removed if their null proportion exceeds the threshold.
+    """
     if verbose:
-        print(f"Removed: {cols_to_remove}")
-    df = df.drop(columns=cols_to_remove)
+            print('\nREVIEWING FUNDAMENTALS COVERAGE AND REMOVING THOSE BELOW THRESHOLD')
+    # Iterate over the list of columns and check their null proportions
+    for column in cols_to_check:
+        null_proportion = df[column].isna().mean()
+        if null_proportion > threshold:
+            if verbose:
+                print(f"Column '{column}' has {null_proportion:.2%} null values and will be removed.")
+            df = df.drop(columns=[column])
+        else:
+            if verbose:
+                print(f"Column '{column}' has {null_proportion:.2%} null values and will be retained.")
     return df
 
 
-def get_fundamentals_cols(df):
-    mcap_index = df.columns.get_loc("mcap")
-    ltdebt_index = df.columns.get_loc("lt_debt")
-    fundamental_cols = list(df.columns[mcap_index:ltdebt_index + 1])
-    return fundamental_cols
+def replace_and_fill_zeros_in_fundamentals(df, covariates, verbose=False):
+    """
+    Replaces zeros in specified covariates with NaN and then fills missing values using forward fill and backward fill.
 
+    Args:
+        df (pandas.DataFrame): The input DataFrame containing the data.
+        covariates (list of str): The list of columns to process.
+        verbose (bool, optional): If True, prints the number of data points that were changed. Default is False.
 
-def replace_and_fill_zeros_in_fundamentals(df, covariates):
+    Returns:
+        pandas.DataFrame: The DataFrame with zeros replaced and missing values filled.
+    """
+    zeros_before = (df[covariates] == 0).sum().sum()
     df[covariates] = df[covariates].replace(0, np.nan)
+    nans_after_replace = df[covariates].isna().sum().sum()
+
+    # Fill missing values using forward fill and backward fill
     df[covariates] = df.groupby('instrument', group_keys=False)[covariates].apply(lambda group: group.ffill().bfill())
+
+    nans_after_fill = df[covariates].isna().sum().sum()
+    zeros_replaced = nans_after_replace - zeros_before
+    nans_filled = nans_after_replace - nans_after_fill
+
+    if verbose:
+        print('\nREPLACING ZEROS WITH NULLS IN FUNDAMENTALS AND FILLING THE MISSINGS PER INSTRUMENT')
+        print(f"Number of zeros replaced: {zeros_replaced}")
+        print(f"Number of NaN values filled: {nans_filled}")
+
     return df
 
 
-def drop_dual_listing_duplicates(df):
+def drop_dual_listing_duplicates(df, verbose=False):
     """
         Drops the dual-listed instruments for firms with multiple listings, keeping only the instrument with the most data points.
 
@@ -441,14 +580,15 @@ def drop_dual_listing_duplicates(df):
         Args:
             df (pd.DataFrame): The input DataFrame containing firm data with columns 'firm_name' and 'instrument', 
                             along with other fundamental and emissions-related columns.
+            verbose (bool): Whether to print the workings to console.
 
         Returns:
             pd.DataFrame: A DataFrame with only one instrument per firm, specifically the instrument with the most 
                         non-missing data points in the specified columns. If instruments have the same number of data points, 
                         an arbitrary one is kept.
     """
+    n_start = len(df)
     cols_to_audit = get_absolute_emissions_cols(df) + get_fundamentals_cols(df)
-    
     firms_with_multiple_instruments = df.groupby('firm_name')['instrument'].nunique() > 1
     filtered_df = df[df['firm_name'].isin(firms_with_multiple_instruments[firms_with_multiple_instruments].index)]
       
@@ -456,30 +596,145 @@ def drop_dual_listing_duplicates(df):
     instrument_counts = filtered_df.groupby(['firm_name', 'instrument'])[cols_to_audit].apply(lambda x: x.notnull().sum().sum())
     instruments_to_drop = instrument_counts.groupby('firm_name').idxmin().apply(lambda x: x[1]).values
     new_df = df[~df['instrument'].isin(instruments_to_drop)]
+    n_end = len(new_df)
+    if verbose:
+        print('\nCONSOLIDATING DUAL-LISTED FIRMS, KEEPING INSTRUMENT WITH MOST COVERAGE')
+        print(f'Dropping {n_start - n_end} rows to not double-count dual-listed firms.')
+        print(f'{n_end} rows remaining.')
     return new_df
 
 
-def clean_raw_data_from_load(df, group_cols, historical_cols):
-    df = standardise_missing_values(df)
-    df = mask_non_reported_co2e(df)
-    df = create_new_emissions_aggregates(df)
-    df = consolidate_observations(df, group_cols=group_cols, historical_cols=historical_cols)
-    df = drop_rows_with_all_missings(df, fields_to_check=historical_cols)
-    df = remove_fundamentals_with_low_coverage(df)
-    df = replace_and_fill_zeros_in_fundamentals(df, covariates=get_fundamentals_cols(df))
-    df = drop_dual_listing_duplicates(df)
+def map_country_classification(data, country_classification, verbose=False):
+    """
+    Maps country classification based on country codes, fills missing country codes with HQ country codes,
+    and drops the HQ country code column.
+
+    Args:
+        data (pandas.DataFrame): The input DataFrame containing the country codes and HQ country codes.
+        country_classification (dict): A dictionary mapping country codes to their classifications.
+        verbose (bool): Prints to console what's going on.
+
+    Returns:
+        pandas.DataFrame: The DataFrame with the country code column filled and classified, and the HQ country code column dropped.
+    """
+    data['cc'] = data['cc'].fillna(data['cc_hq'])
+    data['cc_classification'] = data['cc'].map(country_classification)
+    data = data.drop(columns=['cc_hq'])
+    
+    if verbose:
+        print('\nMAPPING COUNTRIES TO DEVELOPED OR EMERGING')
+        # Print the number of country classifications added
+        added_classifications = data['cc_classification'].notna().sum()
+        print(f"Number of country classifications added: {added_classifications}")
+
+        # Print the number of remaining missing classifications
+        missing_classifications = data['cc_classification'].isna().sum()
+        print(f"Number of remaining missing classifications: {missing_classifications}")
+        
+    return data
+
+
+def clean_raw_data_from_load(df,
+                             group_cols,
+                             historical_cols,
+                             year_lower,
+                             year_upper,
+                             data_coverage_threshold_min,
+                             country_classification,
+                             verbose=False):
+
+    df = standardise_missing_values(df, verbose=verbose)
+    
+    # Subset to relevant date range
+    financial_years = ['FY' + str(x) for x in range(year_lower, year_upper)]
+    df = df[df['financial_year'].isin(financial_years)]
+    df['year'] = df['financial_year'].str.replace('FY', '').astype(int)
+    if verbose:
+        print(f'\nSUBSETTING THE RAW DATA TO THE RANGE {year_lower} to {year_upper-1}')
+    
+    df = create_new_emissions_aggregates(df, verbose=verbose)
+    df = mask_non_reported_co2e(df, verbose=verbose)
+    df = consolidate_observations(df, group_cols=group_cols, historical_cols=historical_cols, verbose=verbose)
+    df = drop_rows_with_all_missings(df, fields_to_check=historical_cols, verbose=verbose)
+    df = drop_dual_listing_duplicates(df, verbose=verbose)
+    df = remove_fundamentals_with_low_coverage(df, cols_to_check=historical_cols, threshold=data_coverage_threshold_min, verbose=verbose)
+    df = replace_and_fill_zeros_in_fundamentals(df, covariates=get_fundamentals_cols(df), verbose=verbose)
+    df = map_country_classification(df, country_classification=country_classification, verbose=verbose)
     return df
 
 
-def clean_raw_data_from_load_keep_missings(df, group_cols, historical_cols):
-    df = standardise_missing_values(df)
-    df = mask_non_reported_co2e(df)
-    df = create_new_emissions_aggregates(df)
-    df = consolidate_observations(df, group_cols=group_cols, historical_cols=historical_cols)
-    df = drop_rows_with_all_missings(df, fields_to_check=historical_cols)
-    df[historical_cols] = df[historical_cols].replace(0, np.nan) # set values of zero to missing
-    df = drop_dual_listing_duplicates(df)
+def remove_invalid_observations(df, verbose=False):
+    # Drop firms in this sector because there are so few
+    starting_n = len(df)
+    df = df[df['econ_sector'] != 'Academic & Educational Services']
+    n_post_econ_sector = len(df)
+    
+    # Filter out outlier/erroneous values in the fundamentals
+    df = df[(df['revenue'].notnull()) & (df['revenue'] > 0)] # Revenue is negative or missing
+    n_post_revenue = len(df)
+    df = df[(df['intangible_assets'] > 0)] # remove intangible assets < 0
+    n_post_intangibles = len(df)
+    df = df[(df['capex'] > 0)] # remove capex < 0
+    n_post_capex = len(df)
+    
+    if verbose:
+        print('\nREMOVING INVALID VALUES FROM INITIAL DATA LOAD')
+        print(f'We begin with {starting_n} observations.')
+        print(f'We drop academic and educational service firms as there are so few in their sector. We lose {starting_n - n_post_econ_sector} observations.')
+        print(f'We remove {n_post_econ_sector - n_post_revenue} observations with missing or negative revenue.')
+        print(f'We remove {n_post_revenue - n_post_intangibles} observations with negative intangibles.')
+        print(f'We remove {n_post_revenue - n_post_capex} observations with negative capex.')
+        print(f'{n_post_capex} observations remaining.')
+        
     return df
+
+
+def remove_non_normal_observations(df, verbose=False):
+    """
+    Removes observations with abnormal revenue or CO2e values based on year-over-year ratios for each instrument.
+
+    This function identifies instruments with extreme changes in revenue, Scope 1 and 2 CO2e, Scope 3 upstream CO2e, 
+    and Scope 3 downstream CO2e by calculating the ratio of maximum to minimum values over time for each instrument. 
+    Observations with ratios exceeding the 99th percentile for any of these metrics are considered abnormal and removed from the DataFrame.
+
+    Args:
+        df (pandas.DataFrame): The input DataFrame containing columns for 'instrument', 'year', 'revenue', 
+                               's1_and_s2_co2e', 's3_upstream', and 's3_downstream'.
+        verbose (bool, optional): If True, prints the number of observations removed and the number remaining. 
+                                  Default is False.
+
+    Returns:
+        pandas.DataFrame: The DataFrame with abnormal observations removed.
+    """
+    # Check for abnormal amounts in revenue or reported co2e values
+    df.sort_values(["instrument","year"],ascending=[1,0],inplace=True)
+    abnormals = pd.DataFrame(pd.pivot_table(data= df,index = ["instrument"], \
+                                values = ["revenue","s1_and_s2_co2e","s3_upstream", "s3_downstream"],aggfunc=[np.min, np.max]).to_records())
+    abnormals.columns = ["instrument","min_revenue","min_s12","min_downstream","min_upstream", "max_revenue","max_s12","max_downstream", "max_upstream"]
+    abnormals["revenue_ratio"] = abnormals["max_revenue"]/ abnormals["min_revenue"]
+    abnormals["ratio_s12"] = abnormals["max_s12"]/ abnormals["min_s12"]
+    abnormals["ratio_upstream"] = abnormals["max_upstream"]/ abnormals["min_upstream"]
+    abnormals["ratio_downstream"] = abnormals["max_downstream"]/ abnormals["min_downstream"]
+    abnormals["ratio_s12"] = abnormals["ratio_s12"].fillna(1)
+    abnormals["ratio_upstream"] = abnormals["ratio_upstream"].fillna(1)
+    abnormals["ratio_downstream"] = abnormals["ratio_downstream"].fillna(1)
+    abnormals['ratio_revenue_abnormal'] = np.where(abnormals["revenue_ratio"]>= np.percentile(abnormals["revenue_ratio"],99), 1, 0)
+    abnormals['ratio_s12_abnormal'] = np.where(abnormals["ratio_s12"]>= np.percentile(abnormals["ratio_s12"],99), 1, 0)
+    abnormals['ratio_upstream_abnormal'] = np.where(abnormals["ratio_upstream"]>= np.percentile(abnormals["ratio_upstream"],99), 1, 0)
+    abnormals['ratio_downstream_abnormal'] = np.where(abnormals["ratio_downstream"]>= np.percentile(abnormals["ratio_downstream"],99), 1, 0)
+
+    df = pd.merge(df, abnormals[['instrument', 'ratio_revenue_abnormal','ratio_s12_abnormal','ratio_upstream_abnormal', 'ratio_downstream_abnormal']], how='left',  on='instrument')
+    abnormals = df[(df['ratio_revenue_abnormal']==1) | (df['ratio_s12_abnormal']==1) | (df['ratio_upstream_abnormal']==1) | (df['ratio_downstream_abnormal']==1)]
+    abnormal_instruments = abnormals['instrument'].unique()
+    pre_drop_n = len(df)
+    df = df[~df['instrument'].isin(abnormal_instruments)]
+    post_drop_n = len(df)
+    if verbose:
+        print('\nREMOVING NON-NORMAL REVENUE AND CO2E TRENDS')
+        print(f'{pre_drop_n - post_drop_n} observations dropped. {post_drop_n} observations remaining.')
+    df = df.drop(columns = ["ratio_revenue_abnormal","ratio_s12_abnormal", "ratio_upstream_abnormal", "ratio_downstream_abnormal"])
+    return df
+    
 
 def convert_emissions_to_intensities(df):
     """
@@ -542,45 +797,36 @@ def get_s3_cat_intensity_proportion_cols(df):
     return s3_cat_intensity_cols
 
 
-def get_sector_cols():
-    return ['econ_sector', 'business_sector', 'industry_group_sector',
-            'industry_sector', 'activity_sector', 'econ_sector_code',
-            'business_sector_code', 'industry_group_sector_code',
-            'industry_sector_code', 'activity_sector_code']
-
-
 if __name__=="__main__":
     # Load the data
     file_path = 'data/ftse_world_allcap.pkl'
     with open(file_path, 'rb') as file:
         data = pickle.load(file)
-
-    xgb_dataset = True
-
-    # Basic cleaning
+    
     grp_cols = ['instrument', 'financial_year']
-    historical_cols = ['mcap', 'revenue', 'ebit', 'ebitda',
-                        'gross_profit', 'net_cash_flow', 'assets',
-                        'current_assets', 'current_liabilities',
-                        'inventories', 'receivables', 'net_ppe',
-                        'cost_of_revenue', 'capex',
-                        'intangible_assets', 'lt_debt']
+    historical_cols = get_fundamentals_cols(data)
     
-    if xgb_dataset:
-        data = clean_raw_data_from_load_keep_missings(data, group_cols=grp_cols, historical_cols=historical_cols)
-    else:
-        data = clean_raw_data_from_load(data, group_cols=grp_cols, historical_cols=historical_cols)
-        # Drop remaining data where we have missings in fundamentals after the fill used in clean_raw_data_from_load
-        data = data.dropna(subset=get_fundamentals_cols(data))
+    data = clean_raw_data_from_load(data, group_cols=grp_cols, historical_cols=historical_cols,
+                                    year_lower=2010, year_upper=2023, data_coverage_threshold_min=0.1,
+                                    country_classification=country_classification, verbose=False)
+
+    # Keep observations where at least Scope 1 and Scope 2 data is not missing
+    data = data[(data['s1_co2e'].notnull()) & (data['s2_co2e'].notnull())]
     
-    # Add some more variables and subset to a relevant date period
-    data['year'] = data['financial_year'].str.replace('FY', '').astype(int)
-    data = data[(data['year'] >= 2016) & (data['year'] <= 2022)]
+    # Drop firms in this sector because there are so few
+    data = remove_invalid_observations(data)
     
-    # Sort out country mapping
-    data['cc'] = data['cc'].fillna(data['cc_hq']) # use HQ country code if country code is missing
-    data['cc_classification'] = data['cc'].map(country_classification) # HU, KY and BM added on top of original IMF list
-    data = data.drop(columns=['cc_hq'])
+    # net cash flow is very skewed, let's winsorize
+    winsorize(data['net_cash_flow'], limits=(0.005, 0.005), inplace=True)
+    
+    # Replace 0 emissions scores with missings
+    data['policy_emissions_score'] = data['policy_emissions_score'].replace(0, np.nan)
+    data['target_emissions_score'] = data['target_emissions_score'].replace(0, np.nan)
+    data['emissions_trading_score'] = data['emissions_trading_score'].replace(0, np.nan)
+    # TODO: Verify that zero has no interpretation
+    
+    # Remove non-normal observations in revenue and co2e
+    data = remove_non_normal_observations(data)
     
     # Get emissions in intensity form
     data = convert_emissions_to_intensities(data)
@@ -588,11 +834,16 @@ if __name__=="__main__":
     # Ensure the data is correctly ordered
     data.sort_values(by=['instrument', 'year'], ignore_index=True, inplace=True)
     
-    # Drop firms in this sector because there are so few
-    data = data[data['econ_sector'] != 'Academic & Educational Services']
+    # Create dummy cols for categoricals
+    data = pd.concat([data, pd.get_dummies(data['financial_year'],prefix = 'financial_year', drop_first=True)], axis=1)
+    data = pd.concat([data, pd.get_dummies(data['econ_sector'],prefix = 'econ_sector', drop_first=True)], axis=1)
+    data = pd.concat([data, pd.get_dummies(data['business_sector'],prefix = 'business_sector', drop_first=True)], axis=1)
+    data = pd.concat([data, pd.get_dummies(data['industry_group_sector'],prefix = 'industry_group_sector', drop_first=True)], axis=1)
+    data = pd.concat([data, pd.get_dummies(data['industry_sector'],prefix = 'industry_sector', drop_first=True)], axis=1)
+    data = pd.concat([data, pd.get_dummies(data['activity_sector'],prefix = 'activity_sector', drop_first=True)], axis=1)
+    data = pd.concat([data, pd.get_dummies(data['cc'],prefix = 'cc', drop_first=True)], axis=1)
+    data = pd.concat([data, pd.get_dummies(data['cc_classification'],prefix = 'cc_classification', drop_first=True)], axis=1)
     
-    # Save
-    if xgb_dataset:
-        data.to_csv('data/ftse_world_allcap_clean_xgboost.csv', index=False)
-    else:
-        data.to_csv('data/ftse_world_allcap_clean.csv', index=False)
+    data.to_csv('data/ftse_world_allcap_clean.csv', index=False)
+
+

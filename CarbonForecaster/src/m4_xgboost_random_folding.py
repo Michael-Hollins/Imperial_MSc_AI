@@ -9,6 +9,8 @@ import pickle
 SEED = 42
 RUN_TRAINING = False
 
+MyGroupKFold = GroupKFold(n_splits=10)
+
 #############################
 # Load and pre-process data
 #############################
@@ -23,25 +25,16 @@ econ_sectors_dummies = [x for x in data.columns if 'econ_sector_' in str(x)]
 
 # Select the dataset
 y_choice = ['s1_co2e']
-x_choice_pre_peers= fundamental_vars + financial_year_dummies + econ_type_dummies
+x_choice = fundamental_vars + financial_year_dummies + econ_type_dummies + econ_sectors_dummies
 id_choice = ['instrument']
 data_choice = data.copy()
-df = data_choice.dropna(subset=y_choice + x_choice_pre_peers + id_choice)
-
-# Now splits - try to get some balance with respect to industries/sectors using the custom function
-df = get_peer_groups_and_folds(df, y_choice[0], sector_features=['econ_sector',
-       'business_sector', 'industry_group_sector', 'industry_sector',
-       'activity_sector'], minimum_firms_per_fold=5, k_folds=10, seed_num=SEED, verbose=False)
-df = pd.concat([df, pd.get_dummies(df['peer_group'],prefix = 'peer_group', drop_first=True)], axis=1)
-peer_dummies = [x for x in df.columns if 'peer_group_' in str(x)]
-x_choice = x_choice_pre_peers + peer_dummies
+df = data_choice.dropna(subset=y_choice + x_choice + id_choice)
 
 # Core data split: 90-10 train-test split
 X, y, group = df[x_choice].values, df[y_choice].values, df[id_choice].values
 random_test_fold = np.random.randint(1,10)
-train_inds = np.array(df.index[df['fold'] != random_test_fold])
-test_inds = np.array(df.index[df['fold'] == random_test_fold])
-df = df[x_choice + y_choice + id_choice + ['fold']].dropna()
+train_inds, test_inds = next(GroupShuffleSplit(test_size = .1, random_state =SEED).split(X,y,group))
+df = df[x_choice + y_choice + id_choice].dropna()
 X_train, X_test, y_train, y_test, ID_train, ID_test = X[train_inds], X[test_inds], y[train_inds], y[test_inds], group[train_inds], group[test_inds]
 
 print("Dataset has {} entries and {} features".format(*df.shape)) # Includes X plus the target and id variables and fold number
@@ -51,15 +44,6 @@ print("Dataset Test has {} entries and {} features".format(*X_test .shape))
 # Format the data for XGB
 dtrain = xgb.DMatrix(X_train, label=y_train, feature_names=x_choice)
 dtest = xgb.DMatrix(X_test, label=y_test, feature_names=x_choice)
-
-# Create the folds for cross-validation
-custom_folds = []
-training_data = df[df['fold'] != random_test_fold]
-training_data.reset_index(inplace=True)
-for i in list(training_data['fold'].unique()):
-    train_indices = training_data.index[training_data['fold'] != i].tolist()
-    test_indices = training_data.index[training_data['fold'] == i].tolist() 
-    custom_folds.append((train_indices, test_indices))
 
 #############################
 # Train the XGB Model
@@ -100,7 +84,7 @@ if RUN_TRAINING:
             # Update the parameter value to cross-validate
             params_xgb[parameter] = val_to_try
             
-            cv_results = xgb.cv(params=params_xgb, dtrain=dtrain, num_boost_round=1000, nfold=len(custom_folds), folds=custom_folds, early_stopping_rounds=50, seed=SEED)
+            cv_results = xgb.cv(params=params_xgb, dtrain=dtrain, num_boost_round=1000, nfold=10, folds=list(MyGroupKFold.split(X_train,y_train,ID_train)), early_stopping_rounds=50, seed=SEED)
             # Update best MAE
             mean_mae = cv_results['test-mae-mean'].min()
             boost_rounds = cv_results['test-mae-mean'].argmin()

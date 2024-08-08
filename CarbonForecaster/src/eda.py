@@ -372,6 +372,7 @@ def sector_breakdown_for_s3_cat_data(df, verbose=True):
         print(sorted_counts_df)
     return sorted_counts_df
 
+
 def describe_data(df):
     numeric_types = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64','uint8']
     dtypes = df.dtypes
@@ -411,7 +412,7 @@ def describe_data(df):
 if __name__=="__main__":
     # Load the data
     data = pd.read_csv('data/ftse_world_allcap_clean.csv')
+    temp = describe_data(data)
+    temp.to_csv('data/temp.csv')
     
-    summary = describe_data(data)
-    summary.to_csv('data/summary.csv', index=False)
     
