@@ -1,0 +1,1108 @@
+\documentclass[12pt,twoside]{report}
+\usepackage{pdflscape}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand\fnote[1]{\captionsetup{font=small, justification=raggedright, singlelinecheck=false}\subcaption*{\textit{#1}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\reporttitle}{Background report: Estimating Scope 3 Emissions}
+\newcommand{\reportauthor}{Michael David Hollins}
+\newcommand{\supervisor}{Dr Ovidiu Serban}
+\newcommand{\degreetype}{MSc AI}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% load some definitions and default packages
+\input{includes}
+\input{notation}
+\date{September 2024}
+
+\begin{document}
+
+% load title page
+\input{titlepage}
+
+
+% page numbering etc.
+\pagenumbering{roman}
+\clearpage{\pagestyle{empty}\cleardoublepage}
+\setcounter{page}{1}
+\pagestyle{fancy}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\begin{abstract}
+%Your abstract.
+%\end{abstract}
+
+\cleardoublepage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\section*{Acknowledgments}
+%Comment this out if not needed.
+
+\clearpage{\pagestyle{empty}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%--- table of contents
+\fancyhead[RE,LO]{\sffamily {Table of Contents}}
+\tableofcontents 
+
+
+\clearpage{\pagestyle{empty}}
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\fancyhead[LE,RO]{\slshape \rightmark}
+\fancyhead[LO,RE]{\slshape \leftmark}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Introduction}
+
+Almost every country in the world has committed to the Paris Agreement, a legally binding international treaty that aims to limit the global temperature increase above pre-industrial levels to 1.5 degrees Celsius: to achieve this, greenhouse gas (GHG) emissions must peak before 2025 and decline 43\% by 2030 \cite{unfcc2024}. Therefore, at the time of writing, we should have reached peak GHG emissions and must expect steep reductions to follow, especially in carbon dioxide which comprises most of the GHG mix \cite{Ritchie2023}. 
+\\\\
+For these ambitious targets to be achieved, firms must play a part to reduce their carbon emissions. As ``what gets measured, gets managed'', a necessary first step is for firms to account and report their GHG emissions. This need motivated the GHG Protocol Initiative, an international accounting and reporting standard for business \cite{ghgprotocol2004}. To assist firms, the Protocol provides a framework that divides emissions into three categories: Scope 1 (S1) encompasses a firm's direct emissions; Scope 2 (S2) are GHG emissions from purchased energy; and Scope 3 (S3) are all other indirect emissions from the value chain. 
+\\\\
+With the GHG Protocol steadily being adopted, over time the availability of GHG emissions data has improved. Nevertheless, significant problems remain with the coverage and accuracy of S3 data \cite{Papadopoulos2022}. Startlingly, while on average over 80\% of a firm's carbon footprint is from S3 emissions, only around half of firms report some S3 emissions data, and only 20\% of firms report material S3 emissions \cite{ftserussell2024}. To try to fill these gaps, attempts have been made to use machine learning (ML) techniques \cite{nguyen2021, Nguyenetal2023}. However, compared to naive baselines such as the sector median, these state-of-the-art approaches have shown only marginal improvements. This is also reflected by of third-party providers who often use sector medians or simple linear models in place of missing S3 emissions. 
+\\\\
+The goal for this project is to evaluate to what extent a deep learning approach using temporal fusion can improve on naive, statistical, and other ML approaches for estimating S3 emissions. Time permitting, this may also include an investigation into how S1, S2 and S3 emissions may be jointly modelled.
+
+\chapter{Common pitfalls}
+
+I don't like to dwell on a load of negatives, but at MSc level, you need to be thinking about the report as an academic document. detailing a research study and its outcomes, as opposed to just conveying a software engineering process. Ideally, think of the software as a means to investigate something.
+\\\\
+The most common issue is where the background sections are good, as they were previously written and have been checked, but the later sections detailing your contributions are rushed and incomplete and the whole report is not balanced.
+\\\\
+Referencing and giving credit to the work of other people is another issue. Some students forget to use Vancouver format, some put incomplete references (or focus on websites/preprints etc as opposed to published academic sources). Some also stop referencing after the background section.
+\\\\
+An inconsistent writing style is another. Change of tenses for no reason. Or one chapter uses "we", then the next uses "I".
+\\\\
+One that does irritate me is when it's not obvious what the structure of the report is, or what the structure of an individual chapter is. For example, there is a chapter, lots of sections, the content within the sections is fine, but the chapter suddenly ends and it's not clear how this all fits into the remainder of the project. Another structural issue, using terms in (say) the introduction as if the reader is an expert, but then not defining those terms until a later chapter.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Background} \label{sec:ChapterBackground}
+
+This chapter introduces the necessary background into S3 greenhouse gas (GHG) emissions reporting, standards and data. We begin with the historical and policy context in Sections \ref{sec:HistoricalContext} and \ref{sec:PolicyContext} respectively. This serves as a springboard to consider how firms are expected to report their S3 emissions in Section \ref{sec:Scope3Reporting}. Next, we cover the data quality issues inherent to this reporting process in Section \ref{sec:Scope3Challenges}. Finally, we conclude by reviewing various approaches in the literature to tackling these issues for S3 modelling in Section \ref{sec:Scope3Modelling}. 
+
+\section{Historical context}\label{sec:HistoricalContext}
+Beginning in the 1800s, naturalists were puzzled to find signs of glacial activity in places too warm for ice sheets to form \cite{young1995}. Then, as the century progressed, some scientists discovered that certain gases such as carbon dioxide caused a so-called ``greenhouse effect'' in their experiments \cite{Ekholm1901}; therefore, they hypothesised that these greenhouse gases (GHGs) might affect the planet's temperature through trapping heat in the atmosphere \cite{Arrhenius1896}. Accordingly, it was plausible that past climates could have been very different from our own \cite{foote1856}. 
+\\\\
+Consistent with this theory, during the twentieth century scientists observed both rising global surface temperatures and steep increases in concentrations of GHGs \cite{Sawyer1972}. Thus, today's mainstream scientific consensus is that the earth's recent climate change is mostly driven by human activity: as economic development has increased the combustion of fossil fuels, this has raised GHG levels in the atmosphere resulting in higher global temperatures \cite{IPCC2021, RS2020}. 
+\\\\
+Accompanying the growing weight of scientific evidence was political conviction that something must be done. Consequently, landmark international treaties were signed such as the 1997 Kyoto Protocol \cite{UN1997} and the 2015 Paris Agreement \cite{UNFCCC2020} which legally required countries to reduce their GHG emissions. Building on this scientific and political momentum around climate change, growing popular concern for the environment further catalysed domestic support for national targets such as Net Zero \cite{Poortinga2023}. 
+
+\begin{figure}[H]
+\centering
+\caption{Global average temperature anomalies and greenhouse gas emissions}
+	\begin{subfigure}[t]{0.475\textwidth}
+		\centering
+		\caption{Average global temperature anomaly}
+		\includegraphics[width=\linewidth]{world\_temp\_anomalies.png}
+		\fnote{Source: \href{https://ourworldindata.org/co2-and-greenhouse-gas-emissions}{Our World in Data \cite{Ritchie2023}}. Global average land-sea temperature anomaly relative to the 1961-1990 average temperature, in degrees Celsius.}
+		\label{fig:WorldTempAnomalies}
+	\end{subfigure}
+	~~
+	\begin{subfigure}[t]{0.475\textwidth}
+		\centering
+		\caption{Global greenhouse gas emissions}
+		\includegraphics[width=\linewidth]{world\_ghg\_emissions.png}
+		\fnote{Source: \href{https://ourworldindata.org/co2-and-greenhouse-gas-emissions}{Our World in Data \cite{Ritchie2023}}. Greenhouse gas emissions include carbon dioxide, methane and nitrous oxide from all sources, including land-use change. They are measured in billions of tonnes of carbon dioxide-equivalents over a 100-year timescale.}
+		\label{fig:WorldGHGEmissions2}
+	\end{subfigure}
+\end{figure}
+
+\section{Policy context}\label{sec:PolicyContext}
+Accurate GHG emissions data are vital for meeting legal obligations and reduction targets, but this is not their only potential use. By gauging the demand for GHG emissions, price discovery is possible for emissions trading markets, helping ensure that these externalities are appropriately priced and so preventing excess emissions. Furthermore, by properly disclosing carbon footprints to investors, they may better hedge their transition risk and follow their ethical preferences. Finally, as emissions are ultimately an unwanted by-product and therefore a source of inefficiency, good GHG accounting helps identify opportunities for reducing waste. 
+\\\\
+In light of such reasons, policy makers recognised the need for an international standard for corporate GHG accounting and reporting. Therefore, in 1998, the \href{https://ghgprotocol.org/about-us}{GHG Protocol Initiative} was launched with a mission to develop and promote the adoption of GHG reporting standards for businesses \cite{ghgprotocol2004}. Since then, the GHG Protocol has increasingly been incorporated into global reporting standards including the Global Reporting Initiative (GRI 305, \cite{gri2016}), the International Financial Reporting Standards (IFRS S2, \cite{ifrs2023}) and the Taskforce on Climate-related Financial Disclosures (TCFD, \cite{tcfd2021}). Through its adoption into legal frameworks and voluntary initiatives, the GHG Protocol has become a popular framework GHG emissions accounting.
+\\\\
+The GHG Protocol Corporate Standard divides a company's emissions into direct and indirect emissions. Direct emissions come from sources that are owned or controlled by the company. On the other hand, while indirect emissions are a consequence of company activity, they occur at sources outside of its ownership or control. To help delineate this further, three ``scopes'' are defined for accounting and reporting purposes. First,  scope 1 (S1) emissions are direct emissions from sources which are owned or controlled by the company. Second, scope 2 (S2) emissions are indirect emissions from the generation of energy that is purchased, such as from electricity, steam, heat and cooling. Finally, scope 3 (S3) comprises all other indirect emissions that occur in the company's value chain. Together, these scopes encompass the total emissions footprint of a company as summarised in Figure \ref{fig:Scope3Diagram} below.
+
+\begin{figure}[H]
+	\centering
+	\caption{Overview of GHG Protocol scopes and emissions across the value chain}
+	\label{fig:Scope3Diagram}
+	\includegraphics[width=\linewidth]{scope\_3\_diagram.png}
+	\fnote{Source: \cite{ghgscope32013}, p.6}
+\end{figure}
+
+In accordance with the Protocol, many jurisdictions require (or will soon require) S1 and S2 disclosures for publicly listed firms, including in the EU \cite{eu20232772}, the US \cite{sec2024}, the UK \cite{ukleg2013} and Japan \cite{fsa2022}. Furthermore, although S3 reporting is currently optional in most of these key financial markets, the regulatory landscape is shifting away from voluntary efforts and towards mandatory S3 disclosures \cite{ftserussell2024}. 
+\\ \\
+To illustrate these developments, we trace how reporting requirements in the UK, one of the most progressive jurisdictions in climate reporting, have picked up over time. Beginning in 2013, listed companies were required to report their S1 and S2 emissions \cite{ukleg2013}. To bring in additional reporting requirements for listed companies, in 2018 the UK introduced the Streamlined Energy and Carbon Reporting (SECR) regime. More significantly, this legislation also brought in new requirements for large unquoted companies and limited liability partnerships to report their S1 and S2 emissions. In addition, it strongly encouraged S3 reporting from all companies, signalling the intended direction of travel \cite{UKSECRGuidance2019}. Accordingly, the UK Government's stated ambition is to introduce mandatory S3 reporting across the entire economy by 2025 in line with the recommendations of the TCFD \cite{ukgov2020}. 
+
+\section{Scope 3 reporting} \label{sec:Scope3Reporting}
+Having set out the origins and development of GHG emission targets, it remains to consider what is required for a firm to comply with the GHG Protocol's  \textit{Corporate Value Chain (Scope 3) Accounting and Reporting Standard} \cite{ghgscope32013}. Possessing a solid understanding of this process will help illuminate the issues of data quality which are covered in Section \ref{sec:Scope3Challenges}.\footnote{S1 and S2 reporting is relatively straightforward as it follows from data within a firm's purview. Accordingly, S3 is where most effort on data coverage, consistency, quality and modelling is required \cite{ManGroup2022}, \cite{Papadopoulos2022}, \cite{ftserussell2024}. This explains our focus on modelling S3 data using, rather than S1 and S2 where ML methods have already proven successful \cite{nguyen2021}.}
+\\ \\
+After the firm has divided its GHG emissions into direct and indirect, the first task is to set the S3 boundary; in short, this means accounting for all S3 emissions in the value chain and to disclose and justify any exclusions. This includes the gases contained in the Kyoto Protocol which are carbon dioxide (C0\textsubscript{2}), methane (CH\textsubscript{4}), nitrous oxide (N\textsubscript{2}0), hydrofluorocarbons (HFCs), perfluorocarbons (PFCs) and lastly sulphur hexafluoride (SF\textsubscript{6}). Furthermore, the company is required to account for these emissions in their respective S3 categories as listed in Table \ref{tab:Scope3Categories}. 
+
+\begin{table}[H]
+\caption{Scope 3 Categories}
+\label{tab:Scope3Categories}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{ccll}
+\multicolumn{1}{l}{} &
+  \textbf{\#} &
+  \multicolumn{1}{c}{\textbf{Category}} &
+  \multicolumn{1}{c}{\textbf{Description}} \\ \hline
+ \parbox[t]{5mm}{\multirow{8}{*}{\rotatebox[origin=c]{90}{Upstream}}} &
+  1 &
+  Purchased goods and services &
+  \begin{tabular}[c]{@{}l@{}}Extraction, production, and transportation of goods and services \\ purchased or acquired by the reporting company\end{tabular} \\ \cline{2-4} 
+ &
+  2 &
+  Capital goods &
+  \begin{tabular}[c]{@{}l@{}}Extraction, production, and transportation of capital goods purchased\\  or acquired by the reporting company\end{tabular} \\ \cline{2-4} 
+ &
+  3 &
+  \begin{tabular}[c]{@{}l@{}}Fuel- and energy-related activities \\ (not included in Scopes 1 or 2)\end{tabular} &
+  \begin{tabular}[c]{@{}l@{}}Extraction, production, and transportation of fuels and energy \\ purchased or acquired by the reporting company not already \\ accounted for in Scope 1 or Scope 2\end{tabular} \\ \cline{2-4} 
+ &
+  4 &
+  Upstream transportation and distribution &
+  \begin{tabular}[c]{@{}l@{}}Transportation and distribution of products or services purchased by the\\  reporting company between their tier 1 suppliers and own operations,\\  including inbound and outbound logistics and inter-facility transport\end{tabular} \\ \cline{2-4} 
+ &
+  5 &
+  Waste generated in operations &
+  \begin{tabular}[c]{@{}l@{}}Disposal and treatment of waste generated in the reporting \\ company's operations\end{tabular} \\ \cline{2-4} 
+ &
+  6 &
+  Business travel &
+  Transportation of employees for business-related activities \\ \cline{2-4} 
+ &
+  7 &
+  Employee commuting &
+  Transportation of employees between their homes and their workplaces \\ \cline{2-4} 
+ &
+  8 &
+  Upstream leased assets &
+  \begin{tabular}[c]{@{}l@{}}Operation of assets leased by the reporting company not included \\ in Scope 1 or Scope 2\end{tabular} \\ \hline
+\parbox[t]{5mm}{\multirow{7}{*}{\rotatebox[origin=c]{90}{Downstream}}} &
+  9 &
+  Downstream transportation and distribution &
+  \begin{tabular}[c]{@{}l@{}}Transportation and distribution of products sold by the company between\\ the company's operations and the end consumer, including retail and storage\end{tabular} \\ \cline{2-4} 
+ &
+  10 &
+  Processing of sold products &
+  Processing of intermediate products sold by downstream companies \\ \cline{2-4} 
+ &
+  11 &
+  Use of sold products &
+  End use of goods and services sold by the reporting company \\ \cline{2-4} 
+ &
+  12 &
+  End-of-life treatment of sold products &
+  \begin{tabular}[c]{@{}l@{}}Waste disposal and treatment of products sold by the reporting company \\ at the end of their life\end{tabular} \\ \cline{2-4} 
+ &
+  13 &
+  Downstream leased assets &
+  \begin{tabular}[c]{@{}l@{}}Operation of assets owned by the reporting company and leased to other \\ entities not included in Scope 1 and Scope 2\end{tabular} \\ \cline{2-4} 
+ &
+  14 &
+  Franchises &
+  Operation of franchises not included in Scope 1 and Scope 2 \\ \cline{2-4} 
+ &
+  15 &
+  Investments &
+  \begin{tabular}[c]{@{}l@{}}Operation of investments (including equity and debt investments and \\ project finance) not included in Scope 1 or Scope 2\end{tabular} \\ \hline
+\end{tabular}%
+}
+\fnote{Source: Adapted from The GHG Protocol \textit{Corporate Value Chain (Scope 3) Accounting and Reporting Standard} \cite{ghgscope32013}}
+\end{table}
+
+These fifteen categories are designed to help firms organise, understand and report on the diversity of S3 activities throughout their value chain. However, while aiming for completeness, it is clear that in some cases, accounting for every category will not be feasible.  Therefore, the GHG Protocol concedes that while some omissions are permitted, ``Companies should ensure that the scope 3 inventory appropriately reflects the GHG emissions of the company, and serves the decision-making needs of users, both internal and external to the company. In particular, companies should not exclude any activity that is expected to contribute significantly to the company's total scope 3 emissions'' (\cite{ghgscope32013}, p.60). It remains for the company to judge what is ``appropriate'' and ``signficant'' to report. 
+\\ \\
+After identifying and categorising the most likely sources of significant emissions in the value chain, the firm must then collect data for quantifying these emissions. There are two main methods to do this. First, where the firm has access to direct emissions data, then they can simply use the direct measurement. In practice, the second method of calculation is much more common, in which the firm uses activity data and emission factors to estimate emissions. In any case, the actual or estimated emissions data is then converted into a carbon dioxide equivalent (C0\textsubscript{2}e) so that S3 emissions can be aggregated and compared regardless of GHG type. If any needed data remains missing, firms may use proxy data to fill gaps. 
+\\ \\
+Using this data, the firm must next estimate their S3 emissions for each category. Importantly, companies may use a combination of calculation methods both within and across categories.\footnote{Note, therefore, that the firm is expected to collect data first and then, based on what is available, apply the most appropriate method for each category, and not the other way around.} There are three calculation methods outlined in the GHG Protocol's S3 guidance and recognised by the literature \cite{ghgscope32013, GoldhammerEtAl2017}. First, there is a process analysis (PA) approach which is bottom-up: it uses primary and secondary production process data and its associated carbon emissions. This has a high level of specificity and focus but may be costly or impossible data to collect. Second, there is input-output analysis (IOA) which is top-down: it uses the input-output tables in the national accounts to allocate the carbon emissions of the economy to smaller units on a sectoral basis. This approach is simple to apply but by providing only averages in a population, it lacks specificity, nuance, and it is difficult to show the results of reduction efforts. Third, there are hybrid approaches which combine PA and IOA which try to combine the strengths of both: under this approach, companies usually begin bottom-up and then fill any remaining gaps top-down \cite{Crawford2008}. 
+\\ \\
+Finally, to comply with the GHG Protocol S3 Standard \cite{ghgscope32013}, the firm must report their S3 emissions with the following requirements:
+\begin{itemize}
+	\item Total scope emissions reported separately by each S3 category;
+	\item For each S3 category, total GHG emissions reported in metric tons of C0\textsubscript{2} equivalent, excluding biogenic C0\textsubscript{2} emissions and independent of any GHG trades, such as purchases, sales, or transfers of offsets or allowances;
+	\item A list of S3 categories and activities included in the inventory;
+	\item A list of S3 categories or activities excluded from the inventory, and with justification for their exclusion;
+	\item Once a base year has been established: the year chosen as the S3 base year; the rationale for choosing the base year; the base year's recalculation policy; S3 emissions by category in the base year, consistent with the base year emissions recalculation policy; and appropriate context for any significant emissions changes that triggered base year emissions recalculations;
+	\item For each S3 category, any biogenic C0\textsubscript{2} emissions reported separately; 
+	\item For each S3 category, a description of the various types and sources of data, including activity data, emission factors and global warming potential (GWP) values, used to calculate emissions, and a description of the data quality of reported emissions data;
+	\item For each S3 category, a description of the methodologies, the allocation methods, and assumptions used to calculate S3 emissions;
+	\item For each S3 category, the percentage of emissions calculated using data obtained from suppliers or other value chain partners.
+\end{itemize}
+These reporting requirements are clearly not trivial. Indeed, such is their nature and extent that some have concluded that they are practically unworkable in their current form \cite{patchell2018}. The next Section explores the common problems that follow from these disclosures.
+
+\section{Data coverage and quality}\label{sec:Scope3Challenges}
+
+Early studies exploring nascent S3 assessments found that the data were largely incomplete and lacking rigour \cite{DownieStubbs2013}. Unfortunately, even after a decade, a report by FTSE-Russell concluded that the data are still characterised by large gaps and poor quality \cite{ftserussell2024}. This suggests that something in the data generating process (as outlined above in Section \ref{sec:Scope3Reporting}) could be driving these inadequate outcomes. This Section describes the main shortcomings of S3 data. Beginning with a review of challenges inherent in the data generating process, we subsequently highlight the problems this causes for analysis. 
+
+\subsection{Issues with the data generating process}\label{sec:DataGenIssues}
+
+Klaaßen and Stoll \cite{klassenstoll2021} identify three causes of error in firms' S3 GHG emissions data: reporting inconsistency, boundary incompleteness and activity exclusion. 
+
+\subsubsection{Reporting inconsistency}
+
+Firms may disclose their S3 GHG emissions through corporate channels including annual reports and corporate social responsibility reports (CSRs), to independent third parties such as the CDP (formerly the Carbon Disclosure Project), or to their regulatory agencies. However, there is no need for these disclosures to be consistent with each other as they are written for different purposes and audiences. In line with the expectations of stakeholder theory, studies have found that on average, GHG emissions disclosed in corporate reports are lower than those reported to the CDP \cite{depoers2016, klassenstoll2021}. As corporate reports are less prescriptive than the CDP questionnaire, it appears that firms use them to paint a better picture of their GHG emissions to the wider public by suppressing their bad outcomes and championing positive measures in so-called ``green-washing''. Notwithstanding this, different figures between reports do not necessarily imply fraudulent or dishonest disclosure: it may simply reflect the choice of valid but different methodologies \cite{depoers2016}. In any case, the upshot is that even for a given firm in a given year which self-reports, there is potentially no consistent source of ground truth. 
+
+\subsubsection{Boundary incompleteness}
+
+For each of the 15 categories of S3 GHG emissions, the GHG Protocol recommends a minimum boundary of what to include and companies are encouraged to choose the most appropriate calculation method depending on data quality and quantity. These calculation methods are either top-down (input-output based), bottom-up (processed based), or a hybrid of the two which begins bottom-up and then fills in the gaps top-down. Furthermore, for the most material categories, companies are encouraged to use primary data, i.e. data sourced directly from other firms. However, there is often limited data transparency across the value chain and so this option is commonly unavailable. Where secondary data such as industry reports and production volumes is also missing, boundary incompleteness follows. Some scholars such as Patchell \cite{patchell2018} argue that this is an intractable problem due to the complexity of global supply chains and the prohibitive costs involved. This might explain why despite the US Securities and Exchange Commission (SEC) previously intending to introduce compulsory S3 disclosures, a move that some argued was a vital step for improving coverage \cite{lgim2023}, it has instead decided against this course of action following objections raised in industry consultations \cite{sec2024}.
+
+\subsubsection{Activity exclusion}\label{sec:ActivityExclusion}
+
+Finally, even when firms report their S3 emissions, they may choose to omit certain relevant categories entirely. Despite the encouragements of standard setters to report S3 emissions that are considered `material' (ISSB) \cite{ifrs2023}, `appropriate' (TCFD) \cite{tcfd2021}, or `significant' (GRI) \cite{gri2016},  firms often report what is easier to measure (e.g. business travel) rather than what is important to their carbon footprint. For example, in their 2022 report, CDP found that only 36\% of reporting firms disclosed their Purchased Goods and Services (Category 1) emissions, which are highly relevant for almost every sector \cite{cdp2022, ftserussell2024}. As this remains a persistent problem, FTSE Russell \cite{ftserussell2024} has recommended that companies begin by reporting the two most material categories for their sector, which on average should encompass over 80\% of their total S3 emissions. However, for now, activity exclusion remains a major obstacle.
+
+\subsection{Consequential problems for data analysis}
+\subsubsection{Missing data}
+The main reason for the paucity of data comes from the nature of S3 emissions: in contrast to S1 and S2, they are by definition emissions in the value chain beyond the firm's direct control or ownership, and therefore the data are often outside a firm's information set. Ideally, firms would be able to share data across the value chain, however there remain significant barriers to doing this, including legal and regulatory challenges, interoperability and data privacy \cite{StenzelWaichman2023}. 
+\\\\
+Accordingly, across various datasets, S3 coverage typically exists for only around half of firms.\footnote{45\% of FTSE All-World constituents report S3 data as of 2021 \cite{ftserussell2024}. For firms reporting to the CDP, 41\%  disclose emissions for one or more S3 category in 2022 \cite{cdp2023}. Bloomberg and Refinitiv Eikon appear to have slightly higher proportions \cite{Nguyenetal2023}.} Furthermore, as reporting remains voluntary and the propensity to report depends on firms' characteristics such as size, sector, and reporting jurisdiction, the missing data should be assumed to be `missing not at random' (MNAR). However, current estimation models used by data providers often do not take this uncertainty into account, leading to misleading prediction intervals and inaccurate predictions \cite{olesiewicz2021}. In this way, missing data is closely related to biased data, the second problem in analysis. 
+
+\subsubsection{Biased data}
+Whereas a firm which is non-reporting is conspicuous by its absence, a more subtle problem is when a firm under-reports either due to boundary incompleteness or activity exclusion. Without close scrutiny of a firm's methodology, the researcher might assume that the reported total S3 emissions is an accurate reflection of the firm's carbon footprint, rather than a reflection of what they choose to measure and report. This problem also further degrades the data generating process; as most firms which self-report under-report their emissions, firms which estimate their emissions using peer averages also under-report as a result \cite{Hoepner2021}. Both problems of missing data (non-reporting) and biased data (under-reporting) are illustrated by Figure \ref{fig:Scope3Coverage}, which shows that most firms don't report their S3 data (i.e. one minus the orange line), and for those that do, they mostly report immaterial figures (i.e. the gap between orange and green line). 
+
+\subsubsection{Volatile data}
+The relative immaturity of S3 reporting is reflected in the high volatility of the data (see Figure \ref{fig:Scope3Volatility}). As of 2021, over half of the disclosed values vary by over 20\% year-on-year, and over a third vary by at least 50\%. Although this is something that could improve over time as reporting practices evolve, the evidence suggests that the issue is still getting worse \cite{ftserussell2024}. Moreover, even when Even when FTSE-Russell considered S1 and S2 data which is much less volatile than S3, they found that irrespective of the methodology used the predictive power of estimates was low and imprecise. Therefore, it is probable that any forecasting exercise using past S3 data will be characterised by statistical insignificance and wide confidence intervals derived from noisy data. 
+
+\begin{figure}[H]
+\centering
+\caption{Global average temperature anomalies and greenhouse gas emissions}
+	\begin{subfigure}[t]{0.475\textwidth}
+		\centering
+	      \caption{Percentage of FTSE All-World constituents disclosing Scope 1, 2, 3 emissions}
+	      \label{fig:Scope3Coverage}
+	      \includegraphics[width=\linewidth]{data\_coverage.png}
+	      \fnote{Source: FTSE-Russell \cite{ftserussell2024}}
+	\end{subfigure}
+	~~
+	\begin{subfigure}[t]{0.475\textwidth}
+		\centering
+		\caption{Percentage of 2021 reported S3 data within YoY variation thresholds}
+		\label{fig:Scope3Volatility}
+		\includegraphics[width=\linewidth]{s3_2021_vol.png}
+		\fnote{Source: FTSE-Russell \cite{ftserussell2024}, reporting entities are from the FTSE All-World constituents that disclose S3 emissions}
+	\end{subfigure}
+\end{figure}
+
+\subsubsection{Lack of consistency and comparability}
+In addition to the issues already discussed, there are three reasons why S3 data may not be comparable across firms. First, despite the specifics covered in Section \ref{sec:Scope3Reporting}, the GHG Protocol provides firms with a wide room for manoeuvre regarding which accounting and reporting methodologies they use. For example, firms must make a number of choices including their organisational boundaries, which categories to report, the calculation approach for each category, data sources, how to allocate emissions, whether to report optional extras above the minimum boundaries and so on. As long as these choices can be justified according to the five key accounting principles (which are relevance, completeness, consistency, transparency, accuracy) then they are said to conform to S3 reporting standards \cite{ghgscope32013}. This methodological latitude opens the possibility for meaningful heterogeneity in firms' S3 accounting and reporting: accordingly, while firms may be consistent with respect to themselves, aggregating them into a portfolio risks comparing apples and oranges. 
+\\ \\
+Second, the GHG Protocol and S3 Guidance is often complimented with standard setters' frameworks and legal rules. While these may intend to be aligned to the GHG Protocol, they invariably introduce particular interpretations and requirements which their signatories are expected to adopt. This could lead to inconsistencies, especially between sectors as they may follow their own industry-specific practices. For example, many financial institutions have adopted the recommendations of the Partnership for Carbon Accounting Financials (PCAF) in an attempt to improve the reporting quality for Category 15 of S3 emissions \cite{PCAF2022}. However, as pointed out by Tang et al. \cite{Tang2023}, the practical considerations of GHG estimation means that PCAF's framework does not align with the reality of availability, reliability and confidence of the ``highest quality'' corporate reported emissions data. This leads to increased non-standardisation, more inaccuracy and further concerns of inconsistency. 
+\\ \\
+Third, when investors wish to compare the GHG emissions of many firms, perhaps to evaluate the transition risk of their portfolio, they frequently turn to data providers such as Bloomberg, CDP, ISS, MSCI, Sustainalytics, Thomson Reuters, and Trucost. However, due to missing data, these providers often use estimates to fill in the gaps. Unfortunately, each use their own methodologies with varying transparency. These different approaches can compound the inconsistency across the data and make it challenging for people to know what the ``real'' S3 emissions are for a collection of firms. Busch et al. \cite{Busch2022} and Kalesnik et al. \cite{KalesnikVitali2022}  found that third-party estimated data was less consistent than data stemming directly from corporate reports, and so the choice of data provider might significantly affect empirical results.\footnote{Busch et al. also found that this third-party estimated data inconsistency was increasing over time, although this has recently been challenged with later data \cite{Swinkels2024}.} However, third-party inconsistencies extend beyond differences in estimation methodologies. Even for values reported by firms, surprisingly Nguyen et al. \cite{Nguyenetal2023} found only 68\% identical data points between Bloomberg and Refinitiv Eikon. 
+
+\section{Estimating S3 emissions}\label{sec:Scope3Modelling}
+
+This Section reviews the academic and data providers' estimation strategies for S3 emissions. Unfortunately, there are not many quantitative papers on S3 emissions in a macro context, such as for a country or industry, due to the reasons mentioned in the previous Section \cite{Hettler2024}. While there are more papers which estimate S1 and S2 emissions, applying these models (for example by transfer learning) is unlikely to yield good results because there is empirically very little relationship between a firm's S1 and S2 emissions versus its reported S3 \cite{ManGroup2022}.   
+\\ \\
+As there is no industry consensus on the best approach for estimating GHG emissions \cite{FTSERussell2022}, the literature offers several approaches, which Nguyen et al. \cite{nguyen2021} categorise as naive, empirical and ML. We employ this same framework to explore S3 estimation. 
+
+\subsection{Naive estimation}
+First, there are naive approaches which use simple averages. They typically involve several sub-models which are then aggregated based on data availability. Common strategies include extrapolation from past emissions, using the firm's consumption or production figures, or simple sector/industry averages. While third-party data providers often use more sophisticated models for S1 and S2, naive approaches are typically used for S3 estimation because they are easy to calculate, simple to explain, and sidestep some of the challenging data quality issues. Companies using such approaches include the ISS \cite{iss2023} and the London Stock Exchange Group (LSEG) \cite{lseg2023}.
+
+\subsection{Empirical estimation}
+
+Second, empirical estimation comprises regression methods which model the linear relationships between variables. While this is a common approach in the literature for estimating S1 and S2 emissions, researchers often don't extend this approach to S3 due to data quality concerns \cite{GoldhammerEtAl2017, KalesnikVitali2022}. Nevertheless, a few attempts have been made in a S3 context.
+\\ \\
+The CDP model employs a gamma generalised linear model (GLM) using revenue and activity information \cite{cdp2023b}. The gamma distribution is chosen due to the positive but heteroskedastic nature of the data. The regressors are the average activity-group revenue intensities reported to the CDP, with revenue divided into 44 variables. To prevent overfitting, model selection is optimised by pruning using the CDP's activity groupings, which are chosen to maximise the Akaike Information Criterion (AIC) for each of the 15 S3 categories. Given the hundreds of possible variables that may act as regressors, others have opted for alternative regressions using regularisation in order to automate model selection \cite{CaiXia2023}.
+\\ \\
+A key drawback for these more traditional statistical approaches is that estimates rely on parametric assumptions that, if not met, will fail to provide the best, linear, and unbiased estimators. Especially important in the context of S3, Olesiewicz et al. \cite{olesiewicz2021} show that if the data is not missing at random, then the regression estimates will be biased.
+
+\subsection{Machine learning techniques}
+Thirdly, Nguyen et al. \cite{Nguyenetal2023} explored the performance of ML models for predicting S3 emissions against naive and statistical approaches.\footnote{There are also some innovative approaches being taken on a more micro level. Jain et al. use natural language processing on a database of financial transactions to proxy for purchased goods and services relevant to S3 emissions \cite{jain2023}. Mejia and Kajikawa employ network analysis to estimate investment-associated S3 emissions of public firms in Japan \cite{Mejia2024}.} The two baseline models were an industry-fill model and a naive OLS model. The industry-fill model simply used the median of disclosed emissions data of a firm's nearest available peer group. The naive OLS model predicted S3 emissions at a categorical level using two financial metrics (revenue and total employees) and a set of dummy industry indicators. 
+\\\\
+For linear models, given the limited number of S3 observations, using an extended set of predictors as in S1 and S2 estimation may lead to multicollinearity issues \cite{nguyen2021}. To avoid this, they used the forward-backward stepwise regression to automatically include relevant predictors and exclude irrelevant ones. They further employed an elastic net to further address multicollinearity issues. 
+\\\\
+For their ML models, they used tree-based ensemble models due to the success in the emissions modelling literature in other scopes \cite{nguyen2021, han2021}. This success is in part because they capture non-linearities and correlations well, whilst also improving the stability and interpretability of the coefficients in predicting carbon emissions. In particular, the authors decided on a Random Forest and Extreme Gradient Boosting. Finally, they also used a linear tree/forest approach which they hypothesised would lead to better predictive results because it combines the learning ability of decision trees with the extrapolation power of linear models. 
+\\\\
+The authors reported big accuracy gains from predicting each category separately and then aggregating them up to estimate total S3 emissions for the firm. Upstream categories appeared easier to predict than downstream categories, perhaps due to better reporting and proxies available. Surprisingly, out of all ML models, only the linear forest consistently outperformed the baseline models in predicting total S3 emissions using both aggregated data and category-level data. Furthermore, when considering prediction accuracy with respect to absolute emission values, even the best prediction model had substantial error. Specifically, the stepwise OLS generated a median absolute error of 72.3\% on aggregated S3 emissions; this meant that only 30\% of the predicted emissions values were within +/- 50\% of the actual reported emissions. 
+\\\\
+Thus, the ML approaches tried so far appear disappointing both relative to simpler models and in absolute terms for predictive accuracy.\footnote{For the sake of completeness, there is also a paper by Serafeim and Velez Caicedo \cite{Serafeim2022}. However, it remains a working paper only, has no citations, and reports extremely high predictive accuracy.}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Data}
+
+\section{Source}
+As this project is in collaboration with the London Stock Exchange Group (LSEG), the data on which my analysis is based is sourced from LSEG Datastream, a global, historical, financial database covering all major asset classes and economic indicators. The data delivery mechanisms include a Desktop application, an Excel plug-in and a feed via an application programming interface (API) available through the \textsc{refinitiv-data} Python package.\footnote{For further detail on LSEG Datastream see \href{https://www.lseg.com/en/data-analytics/financial-data/company-data/company-fundamentals-data}{here}.}
+\\\\
+I base my sample of the FTSE All-World Index; originally launched in the year 2000, as of June 2024 it covers 98 percent of the world's investable market by capitalisation and contains around 4300 large and mid-cap firms \cite{FTSERussell2024b}. This index ensures a global coverage of firms across different industries. Furthermore, I take a snapshot of constituents as of 2022-12-31 to retain a consistent set of firms in my sample. 
+
+\section{Variables selection}\label{sec:VariablesSelection}
+
+As with the aforementioned empirical papers, I aim to use firm fundamentals and characteristics to model and predict emissions. These features each reflect aspects of a firm's size and nature of business, and these, in turn, relate to its carbon footprint. 
+\\\\
+There is often a tension between the availability of data and relevance to the model. For example, some have used the number of employees as a feature \cite{nguyen2021}; it is a useful proxy for a firm's size and it directly relates to some S3 categories such as employee commuting. However, it is not a standard metric in the annual accounting and reporting standards, so data is often unchanging for many years or missing altogether. Given the paucity of emissions data, I do not include features with over $10\%$ of their values missing. This means that I do not include features such as: gross profit, current assets, current liabilities, inventories and cost of revenue. 
+
+\begin{table}[H]
+\caption{Features selected for modelling GHG emissions}
+\label{tab:features}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{llll}
+Static features              & Financials and fundamentals & Policy and emissions context & Emissions measures                               \\ \hline
+Instrument                   & Market capitalisation       & Country classification       & Total S1 emissions                               \\
+Common name                  & Total revenue               & Policy emissions score       & S1 estimation method                             \\
+Country of risk country code & EBIT                        & Target emissions score       & Total S2 emissions                               \\
+HQ country code              & EBITDA                      &                              & S2 estimation method                             \\
+TRBC economic sector         & Net cash flow               &                              & S3 purchased goods and services (cat 1)          \\
+TRBC business sector         & Total assets                &                              & S3 capital goods (cat 2)                         \\
+TRBC industry group          & Receivables                 &                              & S3 fuel and energy (cat 3)                       \\
+TRBC industry                & Net PPE                     &                              & S3 transport and distribution upstream (cat 4)   \\
+TRBC activity                & Capex                       &                              & S3 waste generated (cat 5)                       \\
+                             & Intangible assets           &                              & S3 business travel (cat 6)                       \\
+                             & Long term debt              &                              & S3 employee commuting (cat 7)                    \\
+                             &                             &                              & S3 leased assets (cat 8)                         \\
+                             &                             &                              & S3 upstream estimation method                    \\
+                             &                             &                              & S3 transport and distribution downstream (cat 9) \\
+                             &                             &                              & S3 processing of sold products (cat 10)          \\
+                             &                             &                              & S3 use of sold products (cat 11)                 \\
+                             &                             &                              & S3 end of product life treatment (cat 12)        \\
+                             &                             &                              & S3 leased assets (cat 13)                        \\
+                             &                             &                              & S3 franchises (cat 14)                           \\
+                             &                             &                              & S3 investments (cat 15)                          \\
+                             &                             &                              & S3 downstream estimation method                 
+\end{tabular}
+}
+\fnote{Other features with insufficient coverage were removed as outlined in Section \ref{sec:VariablesSelection}.}
+\end{table}
+
+\subsection{Feature selection}
+\subsubsection{Firm characteristics}
+A firm's carbon footprint is most likely to be tied to its scale of operations and size. Therefore, I use several measures of this. First, I use firm revenue, as carbon emissions are a by-product of revenue generation and this has been included in all prior prediction models in the empirical literature. Second, I use the market capitalisation in the month closest to the firm's fiscal (i.e. reporting) period; market capitalisation can be thought of as an overall measure of the company's worth through investors' assessments of a firm's assets, liabilities and future cash flows. Third, the scale of operations in a firm may be indicated by its asset size. Therefore, I use total assets, intangibles, and net property, plant and equipment values. The latter is especially useful as high values may indicate the presence of physical plants and equipment (PPE) that are likely to be more closely related to greenhouse gases. On the other hand, firms with high intangible assets are less likely to have a substantial carbon footprint.
+\\\\
+Next, I include variables relating to the business model of the firm. I use earnings before interest and taxes (EBIT) and earnings before interest and taxes before depreciation and amortization (EBITDA). These can be a useful indicator of business activity. For example, some firms with very stable cash flows (and relatively low valuations) are utility firms which may have a substantial carbon footprint. Other firms such as commodity producers often exhibit highly volatile earnings depending on changes to spot prices. Having both EBIT and EBITDA also allows me to consider the impact of asset depreciation; higher depreciation might mean firms invest in more equipment, modernising, and so reduce their carbon footprint. I also include other measures of earnings such as net cash flow and receivables. In addition, I include a firm's long term debt, as I suspect that higher long term debt obligations restrict a firm's ability to borrow, invest, and modernise, which may raise their carbon footprint. Most importantly for the business model, I include the firm's peer groups which is a measure of a firm's economic sector, industry, or activity depending on the level of granularity. This is covered in more detail in Section \ref{sec:PeerGroups}.
+\\\\
+Capital expenditures (capex) is another important variable I include. Adoption of modern technologies and equipment can be indicated by high levels of capex, and so similar to considerations about long term debt and asset depreciation, it is a feature that goes some way to explain a firm's level of technology which has clear implications for its carbon footprint via efficiencies. 
+\subsubsection{Environmental and regulatory context}
+The final features I include relate to the firm's business, environmental and regulatory context. I begin with each firm's so-called primary country of risk. According to Refinitiv, this is based on the StarMine Countries of Risk Model which uses four sources of data: revenue distribution by geography, the location of a company's headquarters, the country where its primary equity security listing trades, and financial reporting currency. This hence provides a rounded view of the country to which a company is most exposed, which is a better measure than, e.g. the HQ location which may be skewed by tax regimes. I then map these countries of risk into either "Advanced" or "Emerging" buckets as set out by the International Monetary Fund (IMF) World Economic Outlook database for 2023 \cite{IMFWEO2023}. This is an important feature to include as, first, advanced economies have higher reporting standards and so higher rates of GHG disclosure, and second firms in advanced economies are likely to be less carbon intensive as their energy mix likely includes a higher renewable share and more modern technology. Some past studies have tried to use a firm's energy use, map that to their country's energy mix and include that in their feature set. However, energy use data is often missing and country energy mix data is infrequent. Therefore I have chosen to keep my model parsimonious by just using the country risk classifications of either "Advanced" or "Emerging", perhaps at the risk of my models' prediction ability. 
+\\\\
+I also include measures relating to the firm's policies on emissions reduction which situate the firm's efforts within its sector. The Target Emissions Score measures to what extent firms have set targets on  emissions reduction. The Policy Emissions Score measures how the firm uses policies to improve emissions reductions; this includes measures relating to the mechanisms or programmes in place, using a firm's formal, documented processes for controlling emissions and driving improvement. Both of these emission scores range from 0 to 100 and follow a transparent, detailed, fully-automated methodology \cite{RefinitivESG2023}.
+
+\subsubsection{Rationalising the feature choice set}\label{sec:ChoosingFeatureSet}
+As well as the features outlined above, there are production-specific features that I considered but, on reflection, decided to exclude. These include measures such as how much crude oil or natural gas is produced. However, this only applies to a very small number of firms in the sample, and while this would provide more colour on these firms, it clearly would not extend to building a general model that spans across sectors.
+\\\\
+The choice of features above is driven by a combination of data availability and \textit{a priori} theory. One potential issue is the presence of multicollinearity i.e. where several features are highly correlated with each other, and indeed the correlation matrix below in Figure \ref{fig:FeatureCorrleationMatrix} reveals that some variables are highly correlated, e.g. EBIT and EBITDA. This has the potential to cause computational problems and makes precise estimation of coefficients more difficult. 
+
+\begin{figure}[H]
+	\centering
+	\caption{Correlation matrix between numeric features}
+	\label{fig:FeatureCorrleationMatrix}
+	\includegraphics[width=\textwidth]{CarbonForecaster/report/figures/feature_correlation_matrix.png}
+\end{figure}
+
+One potential solution to feature selection that Nguyen's previous study uses is to employ a Forward-Backward Stepwise Regression, which automatically includes relevant predictors (e.g. $<1\%$ significant level) into the model and excludes irrelevant ones (e.g. $>5\%$ significant level). Indeed, when I take this algorithmic approach to feature selection I retain only 15 features, with the vast majority of dummy variables removed. 
+\\\\
+While on the surface this may appear to be an attractive solution, as pointed out by Harrell (2015) this approach ``violates every principle of statistical estimation and hypothesis testing'' \cite{Harrell2015}. Therefore, I choose to retain my extended feature set at the risk of parameter instability. Nevertheless, certain models I go on to apply such as XGBoost and the elastic net use regularisation and in-built predictor selection abilities which, to some extent, should address the issue of potentially redundant features. 
+
+\subsection{Target variable}
+
+The primary target variables of interest are the S3 categories given in the right-hand column of Table \ref{tab:features}. I aggregate the upstream and downstream columns into S3 upstream total and S3 downstream total respectively. These, in turn, are summed to give a S3 category total. These are the three target variables of primary interest. 
+\\\\
+In addition to the fifteen S3 category variables, Refinitiv also provides a S3 emissions total. However, this field lacks any associated methodological information and so it is impossible to say which data points are estimated or imputed, and which are reported. Therefore, I have chosen to only use reported category-level. Furthermore, I also choose to model total S1 emissions, S2 emissions, and total S1 and S2 emissions. This is to provide comparison and contrast to S3 estimation and to compare against earlier studies that focus on just these scopes.
+\\\\
+Finally, while S1 and S2 emissions are conceptually distinct from S3, a simple plot of total S1 and S2 vs total S3 emissions reveals, surprisingly, a significant, positive relationship (see Figure \ref{fig:S123DotPlot} in Appendix \ref{sec:chartbook}). Therefore, I also include S1 and S2 emissions figures as features. 
+
+\section{Sample construction}\label{sec:SampleConstruction}
+
+Ahead of modelling GHG emissions, I do some work to prepare my data. First, I call the data from the Refinitiv database using the API wrapped in the Python package \textsc{refinitiv}. To be assured of the results, I also separately call the data via the Excel plug-in and perform a systematic comparison to ensure they return identical results. 
+\\\\
+I begin by retrieving the static data on all FTSE All-World index constituents as of 2022-12-31, such as primary country of risk and sector information. I then merge on a set of fundamentals data. Finally, I add on a snapshot of each firm's market capitalisation using the nearest available (backward-looking) data point relative to the fundamental data. 
+\\\\
+With the raw data loaded, I undertake a series of filtering processes, visualised in the Sankey diagram in Figure \ref{fig:Sankey}. There are three important aspects of this process.
+
+\begin{figure}[]
+	\centering
+	\caption{Sankey diagram of sample construction}
+	\label{fig:Sankey}
+	\includegraphics[width=0.9\textwidth]{CarbonForecaster/report/figures/preprocessing_sankey.png}
+\end{figure}
+
+First, most of the filtering takes place by removing observations without S1 and S2 data. This highlights that even with the more covered scopes, much of the data remains missing in the FTSE All-World universe as reporting stringency varies according to region. Second, I have chosen to remove financial firms as their fundamentals are often not an accurate reflection of their underlying business, and it is common practice to consider only non-financial firms in cross-sector analysis. Third, as a final stage of filtering I remove observations with abnormal revenue or CO2e values based on year-over-year ratios for each instrument. I identify instruments with extreme changes in revenue, Scope 1 and 2 CO2e, Scope 3 upstream CO2e, and Scope 3 downstream CO2e by calculating the ratio of maximum to minimum values over time for each instrument. Then, observations with ratios exceeding the 99th percentile for any of these metrics are considered abnormal and removed from consideration. 
+\\\\
+In addition, steps were taken to improve data coverage and numerical stability of some of the features. Fundamentals data were forward and backward filled to account for missing values. In addition, net cash flows were winsorized given the high skew and kurtosis exhibited.
+\\\\
+Lastly, as I model S1 and S2 emissions as well as S3, I will refer to the full sample as all observations where the S1 and S2 emissions total is not null. Where S3 category-level data is also present, I will refer to this as the S3 sample. As shown by the summary of the numeric variables given in Appendix \ref{sec:SampleSummary}, while the full sample has around 10,800 observations, S3 category-level data only exists for around 3,200 observations.
+
+\section{Coverage}\label{sec:Coverage}
+
+One of the main concerns discussed in Section \ref{sec:Scope3Challenges} is data coverage. Figure \ref{fig:S3StylisedFacts} contains four subplots to help build a picture regarding how S3 emissions are covered in my sample. Figure \ref{fig:S3CoverageByMcap} uses a snapshot of the full sample in 2022, highlighting how S3 disclosure improves with firm market capitalisation. This makes intuitive sense in that larger firms likely have more resources (and arguably more investor pressure/profile) to disclose their S3 data. However, it also corroborates the argument that carbon emissions data is likely missing not at random \cite{olesiewicz2021}. 
+
+\begin{figure}[H]
+\centering
+\caption{S3 coverage in my sample}
+\label{fig:S3StylisedFacts}
+    \begin{subfigure}[t]{0.49\textwidth}
+		\centering
+	      \caption{S3 disclosure by market capitalisation}
+	      \label{fig:S3CoverageByMcap}
+	      \includegraphics[width=\linewidth]{CarbonForecaster/report/figures/s3_disclosure_by_mcap.png}
+	\end{subfigure}
+	\begin{subfigure}[t]{0.49\textwidth}
+		\centering
+		\caption{S3 disclosure by category}
+		\label{fig:S3DisclosureByCategory}
+		\includegraphics[width=\linewidth]{CarbonForecaster/report/figures/s3_disclosure_by_category.png}
+	\end{subfigure}
+	\begin{subfigure}[t]{0.49\textwidth}
+		\centering
+	      \caption{GHG emissions reporting by year}
+	      \label{fig:GHGCoverageByYear}
+	      \includegraphics[width=\linewidth]{CarbonForecaster/report/figures/ghg_observations_by_year.png}
+	\end{subfigure}
+	\begin{subfigure}[t]{0.49\textwidth}
+		\centering
+		\caption{S3 disclosure by sector}
+		\label{fig:S3DisclosureBySectorInclMateriality}
+		\includegraphics[width=\linewidth]{CarbonForecaster/report/figures/s3_disclosure_by_sector_incl_materiality.png}
+	\end{subfigure}
+ \fnote{Charts inspired by \cite{FTSERussell2022} and \cite{ftserussell2024}.}
+\end{figure}
+
+Second, Figure \ref{fig:S3DisclosureByCategory} considers all the S3 category-level data reported in the S3 sample. It reveals how firms tend to disclose what is easy to disclose, rather than what is material to their emissions profile. For example, category 6 of S3 emissions refers to emissions from employee business travel. While this category has a disclosure rate of over 80 percent, it accounts for less than one percent of total S3 emissions reported.\footnote{Disclosure in this context refers to: for a given firm-year observation, if S3 categories are disclosed, what percentage of them include a given category.} The most material categories with respect to how they impact total reported S3 emissions are category 11 (use of sold products) with 71 percent, category 1 (purchased goods and services) with 13 percent, category 10 (processing of sold products) with 5 percent, and category 3 (fuel- and energy-related activities) with 4 percent. 
+\\\\
+Ideally, S3 category disclosure would better reflect how material each category is for building an accurate picture of a firm's emission profile (see discussion in Section \ref{sec:ActivityExclusion}). To inspect this further, for each economic sector in the TRBC I map which two categories are most material as recommended by the S3 FTSE Russell Report \cite{ftserussell2024}. Sample materiality is shown in Figures \ref{fig:GHGCoverageByYear} and \ref{fig:S3DisclosureBySectorInclMateriality}. 
+\\\\
+Figure \ref{fig:GHGCoverageByYear} shows a simple count of observations per year. As the instruments I use for my universe are the 2022 members of the FTSE All-World Index, the number of instruments gradually reduces the further back in time as some firms had not yet listed. Nevertheless, a clear pattern emerges which is consistent with the earlier Figure \ref{fig:Scope3Coverage} from FTSE Russell. First, S3 emissions are consistently lower than S1 and S2 emissions. Second, material S3 disclosure account for only around half of total S3 disclosure. Third, as I am only using reported data, it is clear that pre-2020, S3 category reporting is somewhat rare. This will inform the modelling approach set out in Section \ref{sec:ModelChoiceConsiderations}. 
+\\\\
+Finally, Figure \ref{fig:S3DisclosureBySectorInclMateriality} reports what percentage of firms disclose S3 category data and the split between total disclosure vs material disclosure by TRBC economic sector. While technology firms disclose most and have a majority of their disclosures material, the healthcare, energy and real estate sectors all exhibit relatively low rates of disclosure and low shares of material disclosure. This clear imbalance between sectors raises the question of how to deal with firms from different industries.
+
+\section{Sample stratification into peer groups}\label{sec:PeerGroups}
+
+Before splitting my sample into train and test sets, it is important to stratify it properly. Firms belong to different sectors, which likely influences their GHG emissions as discussed in Section \ref{sec:VariablesSelection}. Effective stratification ensures that both the training and test sets maintain similar proportions of firms from each sector. Without stratification, a random split could result in an under- or over-representation of certain sectors in the test set, potentially compromising model performance. By stratifying the data to mirror the real-world distribution, I can enhance the model's ability to generalise, especially when sector classes are imbalanced (see Figure \ref{fig:EconSectorBreakdownS32022}). 
+
+\begin{figure}[H]
+    \caption{Sector plots for firms reporting S3 emissions in 2022}
+    \label{fig:SectorsForS32022}
+    \centering
+
+    % First subplot spanning the entire text width
+    \begin{subfigure}[b]{\textwidth}
+        \centering
+        \caption{S3 emission intensity by economic sector and industry subgroup}
+        \label{fig:S3IntensityByEconSectorIndustrySector}
+        \includegraphics[width=\textwidth]{CarbonForecaster/report/figures/econ_versus_industry_median_s3_intensity.png}
+    \end{subfigure}
+    
+    % Adding some vertical space between subplots
+    \vspace{0.5cm}
+
+    % Second subplot using minipage with subcaption
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \caption{Economic sector breakdown}
+        \label{fig:EconSectorBreakdownS32022}
+        \includegraphics[width=\textwidth]{CarbonForecaster/report/figures/industry_breakdown_2022_s3_cat_total.png}
+    \end{subfigure}
+    \hfill
+    % Third subplot using minipage with subcaption
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \caption{Sector coverage vs volatility}
+        \label{fig:SectorCoverageVsVol}
+        \includegraphics[width=\textwidth]{CarbonForecaster/report/figures/vol_vs_coverage_sector_level.png}
+    \end{subfigure}
+
+\end{figure}
+
+The Thomson Reuters Business Classification  (TRBC) has five levels of increasing granularity: economic sector, business sector, industry group, industry, and finally activity.\footnote{See \href{https://www.lseg.com/en/data-analytics/financial-data/indices/trbc-business-classification\#features-and-benefits}{here} for more details.} On the one hand, using more granular levels can potentially improve the accuracy of predictions; Figure \ref{fig:S3IntensityByEconSectorIndustrySector} illustrates that even within an economic sector there is a large variation in constituent industries. While variation generally decreases with TRBC level, Figure \ref{fig:SectorCoverageVsVol} shows how it comes at the cost of dramatically reducing peer group size. 
+\\\\
+To select an appropriate peer group, I use an algorithm in which I specify the minimum number of peers that must exist in any group. The algorithm then determines the most granular TRBC classification which we assign to the firm's peer group. For example, if I require at least three firms per fold, and ten folds, then the algorithm finds the lowest level sector that has at least thirty firms. 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Modelling Approach}
+
+This chapter introduces the eight model types I employ to predict GHG emissions. In keeping with the labels of "naive", "statistical" and "machine learning" used from earlier literature (see Section \ref{sec:Scope3Modelling}), I use two naive models, two statistical models, and four machine learning models.
+
+\section{Model choice considerations}\label{sec:ModelChoiceConsiderations}
+I anticipate that eight model types may, at first, appear indiscriminate. However, each brings its own unique set of strengths and weaknesses, such that each helps add to the overall assessment of what works better or worse. In addition, for regression problems such as this, many techniques have been developed by the machine learning community precisely because there is not a one-method-fits-all paradigm. Furthermore, estimating GHG emissions is still a nascent field, and I believe it is reasonable to try many different approaches to see what performs better.
+\\\\
+Moreover, it is also important to consider, briefly, the model types I chose not to use, and this relates to my overall approach to time series forecasting which is driven by the data. In particular, there are two common approaches to time series forecasting. First, there is  ``direct forecasting'' which involves predicting future values of a time series by using past observations. In other words, the goal is to estimate the value of the target variable at time $t+n$ based on the data available up to time $t$. Second, there is time series forecasting using covariates whereby a model learns the relationship between the target variable and one or more covariates during a training phase. In the test phase, the model predicts the value of the target variable based on the values of the covariates. This is also sometimes termed ``multivariate time series forecasting''. 
+\\\\
+It is clear from Section \ref{sec:Coverage} that, because coverage has greatly improved in later years, the approach of direct forecasting would risk reducing the training dataset too much because we would lose a lot of observations by even excluding just the year 2022. Due to the nature of the data available, therefore, I have adopted the second approach of forecasting with covariates. In order to use methods that respect the characteristics of my data, I have excluded certain models from consideration.
+\\\\
+Firstly, I have avoided using autoregressive approaches such as ARIMA or VAR models which are common time series forecasting approaches in other domains, such as economics. This is because these more traditional models are better at handling small, less noisy datasets. Additionally, they were developed to model univariate processes or only a handful of variables. Secondly, I have avoided using more state-of-the-art transformer-based deep learning models, such as the temporal fusion transformer (TFT). This is because these models are typically better at capturing more intricate time dependencies such as trend, seasonality and ad-hoc components such as holiday periods. By contrast, my emissions data is annual, limited, and too volatile to exhibit any clear trend. In addition, the more established deep learning approaches such as RNNs and LSTMs were designed with direct forecasting in mind which also makes them unsuitable for application in this context. 
+
+\section{Workflow and preprocesing}
+The core workflow for my modelling is visualised below in Figure \ref{fig:Workflow}. I begin by loading and cleaning the data to construct my sample as set out in Section \ref{sec:SampleConstruction}.
+\\\\
+Ahead of any modelling, I also undertake some important preprocessing steps. 
+\\\\
+Next, I stratify my sample (see Section \ref{sec:PeerGroups}) into ten folds, each with a roughly balanced number of firms for each peer group. One fold is pseudo-randomly chosen as the test dataset and set aside until the final evaluation. The remaining training data is passed into a nine-fold cross-validation over a grid-search of hyperparameters.\footnote{Details of the key hyperparameters over which cross-validation was performed - and which were subsequently chosen following model tuning - can be found in Appendix \ref{sec:ModelHyperparameters}.} Once the best combination of hyperparameters has been found, the model is re-trained using all the training data and the chosen hyperparameters. Finally, this trained model is applied to the held-out test fold. All trained models are implemented using the Python package \textsc{Scikit-Learn}. 
+
+\begin{figure}[H]
+	\centering
+	\caption{Empirical workflow}
+	\label{fig:Workflow}
+	\includegraphics[width=\textwidth]{CarbonForecaster/report/figures/MLWorkFlow.png}
+\end{figure}
+
+\section{Models}
+
+\subsection{Naive models}
+
+I use two naive models - the industry fill and OLS regression - which provide simple baselines against which to benchmark the more sophisticated models to follow. 
+
+\subsubsection{Industry fill}
+
+Beginning with the most simple, the industry-fill model estimates the carbon emissions of a firm by using the median among its peer group in the training data.\footnote{The name ``industry-fill'' is found elsewhere in the literature because it is typically the firm's industry from which the median is derived. In my context, I use the firm's nearest available peer group as described in Section \ref{sec:PeerGroups}. However, to remain consistent with the literature I use the term ``industry-fill'' here.} This provides a baseline against which to assess more sophisticated techniques, and it is a typical benchmark used in other studies such as in Klaaßen and Stoll \cite{klassenstoll2021} and Nguyen et al \cite{nguyen2021, Nguyenetal2023}. Just as importantly, it is also a standard method used by the major commercial data providers such as LSEG \cite{ftserussell2024} and Bloomberg \cite{Bloomberg2023}, at least as a starting point.
+\\\\
+The industry-fill for total metric tons of CO2 equivalent is given by:
+
+\begin{equation}
+    \mathit{Emission_{i\in{IND},t}}= \mathit{median}(\mathit{Emission_{IND})}
+\end{equation}
+
+The industry-fill has several advantages: it is tractable, easy to compute, the data is widely available, it is not skewed by outliers, and it aligns with the `precautionary principle' emphasised in the literature \cite{Hoepner2021, olesiewicz2023}, such that firms which don't report are assumed to be at least as emitting as their peers who do report. 
+\\\\
+However, there are plainly limitations to the industry-fill. First, it ignores all firm-specific information which may be relevant, such as firm size. Second, even within peer groups there is still a wide range of GHG emission values as the data is not too clustered around the average. Nevertheless, it is a useful starting point.
+
+\subsubsection{OLS Regression}
+
+Another common baseline is a simple ordinary least-squares regression based on a proxy for firm size and some fixed effects. For example, Kalesnik et al. \cite{KalesnikVitali2022} regress log emissions on log of net sales along with industry, year and country fixed effects, finding that this explains over 80 percent of in-sample variation. 
+\\\\
+The aim of ordinary least-squares (OLS) regression is to estimate the conditional mean of a dependent variable given some independent variables. Put another way, it models the average relationship between the predictors and an outcome using a single line. This line represents the best fit for all data points based on the mean of the dependent variable. OLS is one way to derive the line of best fit.
+\\\\
+More formally, let  $y$ denote the dependent variable represented as an $n \times 1$ vector of observed values, $X$ an $n \times m$ matrix of explanatory variables, and $\beta$ an $m \times 1$ vector of coefficients to be estimated. OLS fits a parameter vector $\beta$ such that the predicted values $\hat{y}=X\beta$ are as close as possible to the observed values in $y$. This is done by minimising the sum of the squared residuals (i.e. differences) between the observed values $y$ and the predicted values $\hat{y}$. Accordingly, the goal of OLS is to minimise the objective (loss) function:
+\begin{align}
+    \text{minimise } \sum_{i=1}^{n} (y_i - \hat{y}_i)^2 = \text{minimize } (y - X\beta)^\top (y - X\beta),
+\end{align}
+\\\\
+To find the vector $\beta$ that minimises the sum of squared residuals, one takes the derivative of the objective function with respect to $\beta$ and set it to zero: 
+\begin{align}
+    \frac{\partial}{\partial \beta} \left( (y - X\beta)^\top (y - X\beta) \right) = -2X^\top(y - X\beta) = 0.
+\end{align}
+\\\\
+Solving for $\beta$, one gets: 
+\begin{align}
+    X^\top X \beta = X^\top y \Leftrightarrow  \beta = (X^\top X)^{-1} X^\top y
+\end{align}
+Assuming that the matrix $X$ is of full-rank and therefore invertible.\footnote{In practice, inverting the $X$ matrix can be computationally expensive, so \textsc{Scikit-Learn} implements the optimisation algorithmically instead.}
+\\\\
+OLS will act as a second baseline, incorporating both peer group and firm size. However, given the objective function it is likely to be undermined by the presence of outliers. This leads me to use more sophisticated statistical models.  
+
+\subsection{Statistical models}
+
+Following these naive models, I present the two statistical models: a quantile regression and an elastic net regression. 
+
+\subsubsection{Quantile Regression}
+
+Whereas OLS regression estimates the conditional mean of the dependent variable given the independent variables, quantile regression on the other hand estimates the conditional quantiles of the dependent variable given the independent variables. Rather than focusing on just the central mean tendency, quantile regression allows one to model the distribution of the independent variable. This is especially useful in the case when the data distribution is highly skewed by outliers and so the mean can be highly distorted by extreme values. It is also helpful in cases where the effect of predictors is not uniform across the distribution.\footnote{Also known as ``heteroscedasticity'', where the variance of residuals changes across the magnitude of the independent variable.} 
+\\\\
+Unlike OLS which minimises the sum of the squared residuals, quantile regression minimises the sum of the weighted absolute residuals. Therefore, for the $\tau$-th quantile $(0 < \tau < 1)$ the quantile regression model tries to find the coefficient vector $\beta$ such that: $\hat{y}_{i} = X_{i}\beta$. This minimises the objective function:
+\begin{align}
+    \min_{\beta} \sum_{i=1}^{n} \rho_\tau(y_i - X_i\beta)
+\end{align}
+where $\rho_\tau(u)$ is the check-function defined as:
+\begin{align}
+    \rho_\tau(u) = \begin{cases} 
+    \tau u & \text{if } u \geq 0 \\
+    (\tau - 1) u & \text{if } u < 0 
+    \end{cases}
+\end{align}
+As the quantile regression focuses on minimising the $\ell_1$ norm, all errors are treated with equal magnitude, unlike the $\ell_2$ norm in OLS.
+
+
+\subsubsection{Elastic Net Regression}
+
+The Elastic Net model blends both $\ell_1$ and $\ell_2$ norms for regularisation \cite{ZouHastie2005}. The $\ell_1$ norm, taken from the Least Absolute Shrinkage and Selection Operator (LASSO), adds a penalty to the loss function proportional to the absolute value of the coefficients. This penalty term encourages model sparsity, driving some coefficients to zero; this effectively performs variable selection by excluding irrelevant variables. 
+\\\\
+The presence of the $\ell_2$ norm regularisation, as in Ridge regression, discourages large coefficients and tends to shrink them towards zero. However, unlike LASSO, it doesn't make them exactly zero and so all features remain in the model. 
+\\\\
+There are two key parameters to the Elastic Net. First, $\alpha$ controls the strength of the regularisation; setting $\alpha=0$ is equivalent to solving by OLS. Second, $\lambda$ is a mixing parameter and controls to what extent the Elastic Net is a mixture of LASSO and Ridge. Accordingly, the optimal $\beta$ is found through minimising the loss function:
+\begin{align}
+    \min_{\beta} \left\{ \frac{1}{2n} \sum_{i=1}^{n} \left( y_i - X_i\beta \right)^2 + \alpha \left( \lambda \|\beta\|_1 + \frac{1-\lambda}{2} \|\beta\|_2^2 \right) \right\}
+\end{align}
+
+The key advantages of the Elastic Net model are that, first, it is flexible, as adjusting the $\lambda$ parameter can make transition between Ridge and LASSO easy according to the needs of each dataset. Second, it tends to select groups of correlated variables together which helps mitigate instability. Third, it is particularly helpful when dealing with highly correlated features as flagged earlier in Section \ref{sec:ChoosingFeatureSet}. 
+
+\subsection{Machine learning models}
+
+So far all the models considered have been linear. The use of machine learning models allows me to capture non-linearities in the data. In theory, this might improve predictive power, but previous studies have shown that the gains using the latest machine learning models may be modest \cite{nguyen2021, Nguyenetal2023}. 
+
+\subsubsection{Multi-layer Perceptron}
+
+As the name suggests, the multi-layer perceptron (MLP) model is a type of artificial neural network that is composed of perceptrons stacked into layers. The leftmost layer, known as the input layer, consists of a set of neurons representing the input features. The rightmost layer is the output layer. The layers in between are known as hidden layers which taken in inputs from the previous layer, process them, and pass them on to the next layer. 
+\begin{figure}[H]
+\centering
+\caption{Stylised depiction of MLP structure}
+	\begin{subfigure}[t]{0.3\textwidth}
+		\centering
+	      \caption{Artificial neuron}
+	      \label{fig:ArtificialNeuron}
+	      \includegraphics[width=\linewidth]{CarbonForecaster/report/figures/perceptron.png}
+	\end{subfigure}
+	\hspace{0.15\textwidth}
+	\begin{subfigure}[t]{0.3\textwidth}
+		\centering
+		\caption{A two-layer fully-connected MLP}
+		\label{fig:TwoLayerMLP}
+		\includegraphics[width=\linewidth]{CarbonForecaster/report/figures/MLP.drawio.png}
+	\end{subfigure}
+ \fnote{Source: Adapted from Imperial College London's Introduction to Machine Learning, Lecture 4 notes \cite{CullyReiWang2023}}
+\end{figure}
+Put another way, MLP is a supervised learning algorithm that learns a function $f:R^{m} \rightarrow R^{n}$ by training on a dataset where $m$ is the number of features and $n$ is the dimension of the output. Therefore, given a target vector $y$ and a feature vector $x=x_{1}, x_{2}, \dots , x_{m}$, it can learn a non-linear approximator for regression. The non-linearities are introduced through the activation functions. 
+\\\\
+Using a non-linear activation function $\sigma$, a two-layer MLP is given by:
+\begin{equation}
+\begin{aligned}
+    \mathbf{z}^{(1)} &= \sigma(\mathbf{W}^{(1)} \mathbf{x} + \mathbf{b}^{(1)}) \\
+    \mathbf{z}^{(2)} &= \sigma(\mathbf{W}^{(2)} \mathbf{z}^{(1)} + \mathbf{b}^{(2)}) \\
+    \mathbf{y} &= \mathbf{W}^{(3)} \mathbf{z}^{(2)} + \mathbf{b}^{(3)}
+\end{aligned}
+\end{equation}
+where \(\mathbf{W}^{(1)}\) is the weight matrix connecting the input layer to the first hidden layer and \(\mathbf{z}^{(1)}\) is the output of the first layer etc. For regression applications there is no activation in the output layer. 
+\\\\
+The weights and biases are learnt through backpropagation which is gradient descent applied to a computational graph. It iteratively applies the chain rule of calculus to propagate the error backward through the network layer by layer. For a loss function $L$ and a learning rate $\eta$, the weights are updated via:
+\begin{align}
+    \mathbf{W}^{(l)} \leftarrow \mathbf{W}^{(l)} - \eta \frac{\partial L}{\partial \mathbf{W}^{(l)}}
+\end{align}
+
+Through the use of hidden layers, the MLP can learn different layers of abstraction in the data through complex non-linear relationships. This is a key advantage over the linear models in my naive and statistical groups.  
+
+\subsubsection{K Nearest-Neighbours}
+
+K Nearest-Neighbours (KNN) is a long-established non-parametric approach that makes predictions based on the closest data points in the feature space \cite{SilvermanJones1989}. Using a distance measure, it finds a data point's closest neighbours in the training data and returns an average value for the target variable. As KNN doesn't assume any functional form between the features and the target, instead using only the similarity of observations, it inherently captures non-linear relationships. KNN has other advantages too; it is easy to understand, implement, and interpret. 
+\\\\
+Unfortunately, KNN exhibits the so-called \textit{curse of dimensionality}: as KNN relies on distance metrics, these may not work well if using lots of features in high dimensional spaces. Specifically, if many features are irrelevant, instances that should be near to each other may instead be far away. Notwithstanding this problem, it remains a useful altnerative regression approach due to its non-parametric nature.
+\\\\
+The performance of KNN heavily depends on the choice of $k$, i.e. how many neighbours are taken into account. As a hyperparameter, I optimise the choice using cross-validation, testing $k$ values from 5 to 500 with intervals of 5. 
+\\\\
+Another key choice is how to measure distance. In my tuning I try three measures. For a two points $\mathbf{x} = (x_{1}, \dots, x_{n})$ and $\mathbf{y} = (y_{1}, \dots, y_{n})$: the Euclidian distance is given by $d_{\text{Euclidean}}(\mathbf{x}, \mathbf{y}) = \sqrt{\sum_{i=1}^{n} (x_i - y_i)^2}$. The Manhattan distance is given by $d_{\text{Manhattan}}(\mathbf{x}, \mathbf{y}) = \sum_{i=1}^{n} |x_i - y_i|$. Finally, the Minkowski distance with parameter $p$ is $d_{\text{Minkowski}}(\mathbf{x}, \mathbf{y}) = \left( \sum_{i=1}^{n} |x_i - y_i|^p \right)^{\frac{1}{p}}.$ 
+
+
+\subsubsection{XGBoost}
+
+In the only two previous studies that have employed machine learning techniques to estimate GHG emissions, tree-based methods appear to have shown the most promise \cite{nguyen2021, Nguyenetal2023}. Moreover, decision trees are scale invariant, robust to irrelevant features and are readily interpretable. Therefore, the last two models I include in my set of models are both tree-based: XGBoost and Random Forest. 
+\\\\
+Gradient boosting is an iterative ensemble method where models are built sequentially, each one correcting the errors of its predecessor. It achieves this by fitting a decision tree to the residuals (errors) of the previous model and then adding this tree to the ensemble. Through this process, gradient boosting gradually builds a strong predictive model by combining the outputs of multiple decision trees, effectively capturing complex interactions between features and handling non-linear relationships in the data.
+
+\begin{figure}[H]
+	\centering
+	\caption{Depiction of gradient boosted trees trained for regression}
+	\label{fig:GradientBoosting}
+	\includegraphics[width=\textwidth]{CarbonForecaster/report/figures/gradient_boosting.drawio.png}
+ \fnote{For features $X$ and a target $y$, XGBoost runs successive rounds of training, predicting, and incorporating the residuals $r_{n}$.}
+\end{figure}
+
+Extreme gradient boosting (XGB) implements gradient boosting with several enhancements, including $\ell_{1}$ amd $\ell_{2}$ regularisation to prevent overfitting, an efficient splitting algorithm and second-order gradient optimisation. It is widely used by data scientists as a popular tool for machine learning problems \cite{ChenGuestrin2016}. 
+
+
+\subsubsection{Random Forest}
+
+A Random Forest is an ensemble learning method that builds a large number of decision trees during the training process and combines their outputs using a majority vote to make a prediction. By using voting and ensuring diverse trees through randomness, Random Forests mitigate the risk of overfitting which is a common issue in more simple decision trees \cite{Breiman2001}.
+\\\\
+The randomness in a random forest is twofold. Firstly, random forests use ``bagging'' (or bootstrapping) where each decision tree in the training phase is built on a different random subset of the data. This helps make the trees more diverse to reduce overfitting. In addition to randomly selecting only some rows, random forests also randomly sample from the columns/features at each split in the decision trees. This allows different trees to focus on varying aspects of the data, again helping ensure diversity and prevent overfitting, which is the key disadvantage of decision trees. 
+
+\begin{figure}[H]
+	\centering
+	\caption{Depiction of a random forest trained for regression}
+	\label{fig:RandomForest}
+	\includegraphics[scale=0.7]{CarbonForecaster/report/figures/random_forest.drawio.png}
+    \fnote{For dataset $D$ with features $X$ and target $y$, we train trees on subsets of the data (bagging) and features.}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\chapter{Results}
+
+\section{Discussion}
+
+The results suggest that machine learning techniques do not yet provide a clearly superior approach to more traditional and naive methods. This is somewhat in line with the previous study by Nguyen et al \cite{Nguyenetal2023}, who find that even the most advanced machine learning techniques produce only very modest improvements in prediction accuracy for estimating total S3 emissions. Furthermore, they also find, as I have, that absolute prediction performance is low, even with the best models. 
+\\\\
+The limitations in absolute prediction accuracy are also in line with the report by FTSE-Russell as shown below in Figure \ref{fig:FTSERussellResults}. Whichever approach they take, the find that prediction accuracy is low, even for scopes 1 and 2. 
+
+\begin{figure}[H]
+	\centering
+	\caption{Share of estimated observations within error thresholds by model, S1 and S2}
+	\label{fig:FTSERussellResults}
+	\includegraphics[scale=0.7]{CarbonForecaster/report/figures/ftse_results.png}
+    \fnote{FTSE Russell, \cite{FTSERussell2022}}
+\end{figure}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Outlier analysis}
+
+
+
+\section{Scope 3 Upstream}
+
+\begin{figure}[H]
+	\centering
+	\caption{Random forest predicted vs actual scope 3 upstream emissions}
+	\label{fig:RandomForestS3UpstreamPredictions}
+	\includegraphics{CarbonForecaster/report/figures/s3_upstream_actual_vs_pred.png}
+\end{figure}
+
+\subsection{Alstom PA}
+
+Alstom PA is a France-based manufacturer of infrastructure for railway projects. 
+
+\begin{figure}[H]
+\centering
+\caption{Emissions reporting of Alstom SA}
+	\begin{subfigure}[t]{0.49\textwidth}
+		\centering
+	      \caption{GHG emission aggregates}
+	      \label{fig:AlstomSAEmissionAggregates}
+	      \includegraphics[width=\linewidth]{CarbonForecaster/report/figures/also_pa_emission_aggregates.png}
+	\end{subfigure}
+	\begin{subfigure}[t]{0.49\textwidth}
+		\centering
+		\caption{S3 category breakdown}
+		\label{fig:AlstomSAS3EmissionCategories}
+		\includegraphics[width=\linewidth]{CarbonForecaster/report/figures/also_pa_upstream_categories.png}
+	\end{subfigure}
+\end{figure}
+
+\begin{figure}[H]
+	\centering
+	\caption{Industrial goods s3 upstream emission intensities}
+	\label{fig:AlstomSAEmissionIntensity}
+	\includegraphics{CarbonForecaster/report/figures/also_pa_upstream_intensity.png}
+\end{figure}
+
+
+
+\section{To-do}
+- Can we model upstream vs downstream transport category emissions? 
+
+
+\chapter{Exploratory Analysis}\label{sec:ExploratoryAnalysis}
+
+\section{Imputing missing data}
+
+As already described in Section \ref{sec:DataGenIssues} and documented in Section \ref{sec:ExploratoryAnalysis}, missing data is among the primary issues in relation to S3 emissions data. In this Section, I employ, compare, and contrast a variety of models to impute the missing data.
+\\\\
+This raises the question of how we can evaluate the merits of one estimate over another where data is missing. Unlike a missing data point which might easily be filled in by carrying past observations forward, many firms never report in the first place. In light of this, I adopt an approach similar to that of \cite{KalesnikVitali2022}: if a firm begins reporting emissions at time $t$, we can estimate emissions for time $t-1$ and compare and compare the two. 
+\\\\
+However, this relies on the assumption that emissions are persistent. If they are persistent, then subsequently reported data can be deemed a reliable proxy for historical emissions. However, if emissions are not persistent, then reported values at $t$ will not be informative about the quality of the estimates. Therefore, I use an ancillary model to justify this assumption.
+
+\subsection{How persistent are companies' emissions?}\label{sec:EmissionPersistence}
+
+\section{Estimating missing data}
+
+\section{Forecasting emissions}
+
+\section{Data quality}
+\subsection{Relevance and completeness metrics for each category}\label{sec:RelevanceCompletenessMetrics}
+
+Following the approach of Nguyen et al. \cite{Nguyenetal2023}, we specify some variables to measure the relevance and completeness of each S3 category. First, the \textbf{carbon intensity} normalises emissions by revenue. This allows us to compare emissions across firms of different sizes. Specifically:
+
+\begin{equation}
+    \mathit{Intensity}_{it}^{Cat} = \frac{\mathit{Emissions}_{it}^{Cat}}{\mathit{Revenue}_{it}}
+\end{equation}
+
+where $\mathit{Intensity}_{it}^{Cat}$, $\mathit{Emissions}_{it}^{Cat}$, and $\mathit{Revenue}_{it}$ represents the carbon intensity, S3 emissions and total revenues respectively for firm $i$ at time $t$ for S3 category $\mathit{Cat}$.
+\\\\
+Using carbon intensity measures, we can calculate the relative contribution of each category to the full composition of S3 emissions. For unreported categories where there is no data, we set the values to zero such that it provides no contribution. Therefore, the relative contribution per category is given by:
+
+\begin{equation}
+    \mathit{Contribution}_{it}^{Cat} = \frac{\mathit{Intensity}_{it}^{Cat}}{\mathit{Intensity}_{it}^{Scope3}}
+\end{equation}
+
+Using intensity and contribution we can derive the relevance and completeness of each category. First, the \textbf{relevance} of a category is a mean of its contribution weighted by S3 intensity. This shows how important each S3 category is on average:
+
+\begin{equation}
+    \mathit{\%Relevance^{Cat}} = \frac{1}{n}*\sum_{it}{\{\mathit{\%Contribution_{it}^{Cat}}*\mathit{Intensity_{it}^{Scope3}}\}}
+\end{equation}
+
+Second, the \textbf{completeness} of each category simply returns how many firms report for that category: 
+
+\begin{equation}
+    \mathit{\%Completeness^{Cat}} = \frac{1}{n}*\sum_{it}{\{1 \  \mathit{if \  Disclosure_{it}^{Cat}}=1\}}
+\end{equation}
+
+where $\mathit{Disclosure_{it}^{Cat}}$ is a dummy variable taking the value of one if a firm reports its S3 emissions for that category in a given year. If the firm discloses ``0'', it is still counted as disclosed.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Limitations and extensions}
+
+- Haven't considered missing data (e.g. where a firm stops reporting such as BP)
+
+- Implement linear regression as non-negative least squares by forcing all coefficients to be positive. This can be done by passing a boolean positive parameter. 
+
+- Re-run results setting the minkowski parameter p=3.
+
+\chapter{Models}
+\section{LSEG Baseline}
+With over half of the S3 in the global index universe unavailable, FTSE-Russell (LSEG), like all data providers, rely on estimating S3 data for the non-reporting companies. As this provides the baseline performance against which we evaluate the deep learning (DL) approaches, we cover the main aspects in detail here \cite{ftserussell2024}.
+\\\\
+First, the data is quality-controlled before being used in estimation. In particular, the extreme values are `winsorized' i.e., outliers are replaced with quantiles of the carbon intensities distribution within their respective peer group. This is performed asymmetrically, with a focus on adjusting very low values to guard against under reporting. This aligns with the `precautionary principle' emphasised in the literature \cite{Hoepner2021, olesiewicz2023} wherein firms that report abnormally low GHG emissions are by default assumed to be under-reporting.
+\\\\
+Ideally, each of the 15 S3 categories would be modelled separately, but LSEG have deemed that the data quality and coverage is insufficient. Therefore, the data points which meet basic quality controls are aggregated into upstream and downstream emissions and these upstream and downstream emissions are modelled separately. This allows for flexibility and greater detection of potential under-reporting. For example, an oil and gas firm may report credible numbers for upstream emissions, but if their downstream emissions omit the use of sold product category then their downstream numbers require adjustment. 
+\\\\
+To attenuate the drawbacks of any individual estimation technique, the final S3 estimates are produced from multiple models which are summarised in Table \ref{tab:LSEG-S3-estimation}. These models use different methods, sources of data, statistical assumptions and peer group classifications, and are grouped as either specialised or generalised. 
+\begin{table}[]
+\caption{Methods used in LSEG scope 3 estimation}
+\label{tab:LSEG-S3-estimation}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lll@{}}
+\toprule
+Type        & Model                                                                        & Description                                                                                                                                                       \\ \midrule
+Specialised & Extrapolation                                                                & \begin{tabular}[c]{@{}l@{}}Assigns carbon intensity based on the most \\ recent reported value of intensity by the company \\\\ \end{tabular}                           \\
+Specialised & \begin{tabular}[c]{@{}l@{}}Production model\\ (downstream only)\end{tabular} & \begin{tabular}[c]{@{}l@{}}Calculates Scope 3 downstream carbon emissions \\ based on fossil fuel production of companies \\\\ \end{tabular}                            \\
+Generalised & Sector median                                                                & \begin{tabular}[c]{@{}l@{}}Calculates carbon intensity based on the median \\ carbon intensity of a company’s peer-group \\\\ \end{tabular}                             \\
+Generalised & Regression model                                                             & \begin{tabular}[c]{@{}l@{}}Calculates carbon intensity based on linear \\ regression prediction using ICB classification \\ and region as regressors \\\\ \end{tabular} \\
+Generalised & \begin{tabular}[c]{@{}l@{}}Input-output model\\ (upstream only)\end{tabular} & \begin{tabular}[c]{@{}l@{}}Assigns carbon intensity based on macro-level\\ output and emissions data for each country \\ and industry\end{tabular}                \\ \bottomrule
+\end{tabular}%
+}
+\fnote{Source: Adapted from Table A in  \cite{ftserussell2024}}
+\end{table}
+\\\\
+Specialised models apply when particular conditions are met and typically yield more precise estimates. Examples include when one can simply extrapolate from a company's last reported number, or when downstream emissions can be modelled using production volumes. By contrast, generalised models only rely on data which is available for almost all companies, such as sector classification and revenue. These generalised models estimate carbon intensities based on the sector median, input-output tables or regressions. To reduce annual variation in the final estimate, where generalised models are used the estimates are based on the ‘ensemble method’, which combines the estimates generated by different generalised methods. 
+\\\\
+Final S3 emissions estimates are selected by their data quality. Reported data is preferred, followed by specialised model estimates and an ensemble of generalised models as a last resort (see Figure \ref{fig:LSEGS3Models}). 
+
+\begin{figure}[H]
+	\centering
+	\caption{LSEG scope 3 data and estimates selection hierarchy}
+	\label{fig:LSEGS3Models}
+	\includegraphics[width=\textwidth]{CarbonForecaster/report/figures/LSEG_S3_flowchart.drawio.pdf}
+	\fnote{Source: Adapted from \cite{ftserussell2024}}
+\end{figure}
+
+\section{Naive approaches}
+\subsection{Industry fill model}
+
+
+\subsection{OLS model}
+
+The second naive model is a simple regression using the Ordinary Least Squares (OLS) estimator. This approach attempts to predict emissions using a linear relationship between measures of firm size and fixed-effects to control for the firm's industry group. Both emission values and the size regressors are transformed using the natural logarithm to account for the non-normality of their distributions.
+
+\begin{equation}
+    \mathit{logEmission_{it}^{Cat}}=f(\mathit{logRV_{it}}, \mathit{logEmp_{it}}, \sum_{j}\mathit{IND_{j}})
+\end{equation}
+
+where $f(.)$ is a linear function, $\mathit{logEmp_{it}}$ is the logged total employees of firm $i$ in year $t$ and $\mathit{IND}$ is a set of dummy variables for $j$ GICS groups.
+
+\section{Statistical Models}
+
+In the context of S1 and S2, a common approach to estimating emissions is to use linear regression \cite{GoldhammerEtAl2017, Griffin2017}. The theoretical motivation is that direct emissions and emissions from energy are likely to be related to a firm's production process, and so a few key financial variables such as revenue, intangible assets and leverage may model emissions well. However, S1 and S2 emissions bear little relation to emissions from the value chain, a wider set of financial metrics may be required \textcolor{red}{Insert chart}. 
+\\\\
+Therefore, as per Nguyen et al. \cite{Nguyenetal2023}, I use a wider set of financial metrics for modelling S3 emissions, specifically: revenue, total assets, number of employees, intangible assets, net property plant and equipment (NPPE), capital expense, gross margin, leverage, capital intensity, cost of goods sold (COGS), earnings before interest and taxes (EBIT), earnings before interest, taxes, depreciation and amortisation (EBITDA), operational expense, net income, total debt, current asset, current liability, inventory, and receivables. 
+\\\\
+Given the extended set of predictors and the relatively limited number of S3 observations, this could lead to multicollinearity issues. Therefore, both statistical approaches below are employed to mitigate this issue.
+
+\subsection{Stepwise linear regression}
+
+A stepwise linear regression automatically selects which variables to include in the model. Relevant variables are determined automatically with a threshold of inclusion at a significance level of $<1\%$ and exclusion at $>5\%$. The stepwise nature of the algorithm ensures that how the variables relate to each other is considered at every step, not just individual significance. 
+
+\subsection{Elastic Net}
+
+Another method to ameliorate multicollinearity is to use an elastic net which is a penalised regression model. This approach combines the penalty terms from the ridge and LASSO regressions making it especially good at dealing with correlated variables. 
+
+\section{Assessment}
+
+There are several measures that can be used to compare models. The $R^{2}$ might lead to overfitting because it purely focuses on in-sample model performance. Therefore, to best predict emissions out of sample, we use the $MAE$ etc. (See pp.22-23 of source 30).
+
+
+
+%% bibliography
+\bibliographystyle{plain}
+\bibliography{references}
+
+\appendix
+
+\chapter{Chart book}\label{sec:chartbook}
+
+\begin{figure}[H]
+	\centering
+	\caption{Scopes 1 and 2 vs Scope 3 emissions}
+	\label{fig:S123DotPlot}
+	\includegraphics[width=\textwidth]{CarbonForecaster/report/figures/scope_regression.png}
+\end{figure}
+
+\begin{landscape}
+\chapter{}\label{sec:SampleSummary}
+\begin{table}[H]
+    \centering
+    \caption{Summary description of numeric variables in the full sample}
+    \resizebox{\linewidth}{!}{%
+    \begin{tabular}{|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|l|}
+    \hline
+        \textbf{Feature} & \textbf{Types} & \textbf{Total} & \textbf{Missing} & \textbf{Available} & \textbf{Missing\_Percent} & \textbf{Unique} & \textbf{Min} & \textbf{Max} & \textbf{Mean} & \textbf{Median} & \textbf{Std Error} & \textbf{Kurtosis} & \textbf{Skewness} & \textbf{Quantile5} & \textbf{Quantile95} & \textbf{Quantile25} & \textbf{Quantile75} & \textbf{Quantile10} & \textbf{Quantile90} \\ \hline
+        mcap & float64 & 10798 & 0 & 10798 & 0 & 10768 & 128472959 & 2.90164E+12 & 27981082264 & 10007886349 & 90791948420 & 358 & 16 & 1822541548 & 98057425494 & 4732325367 & 24105221137 & 2570952733 & 53967531542 \\ \hline
+        revenue & float64 & 10798 & 0 & 10798 & 0 & 10733 & 34979642 & 6.03653E+11 & 17110002296 & 6671618551 & 35885785321 & 67 & 7 & 728535124 & 65758200711 & 2680301725 & 16278293865 & 1224415476 & 39604030524 \\ \hline
+        ebit & float64 & 10798 & 0 & 10798 & 0 & 10610 & -17642624021 & 3.0476E+11 & 2021894642 & 715178929 & 6449325801 & 740 & 21 & 39067569 & 7807542162 & 303925519 & 1746352014 & 119751063 & 4313300000 \\ \hline
+        ebitda & float64 & 10798 & 0 & 10798 & 0 & 10646 & -10485816305 & 3.2913E+11 & 3092841968 & 1133788246 & 8127442794 & 404 & 15 & 129901083 & 12145882917 & 492152276 & 2739298784 & 230601630 & 6479348727 \\ \hline
+        net\_cash\_flow & float64 & 10798 & 0 & 10798 & 0 & 10515 & -1792287778 & 38010000000 & 2265177263 & 832036975 & 4664781347 & 28 & 5 & 29798485 & 9264104224 & 338804957 & 2113440134 & 132204377 & 5112131779 \\ \hline
+        assets & float64 & 10798 & 0 & 10798 & 0 & 10741 & 74211519 & 6.63541E+11 & 27389642043 & 11347265929 & 51156734723 & 34 & 5 & 1555725283 & 1.0872E+11 & 4862185062 & 26940914779 & 2351645867 & 61413675821 \\ \hline
+        receivables & float64 & 10798 & 12 & 10786 & 0 & 10573 & -120524654 & 2.06076E+11 & 3766062592 & 1159144840 & 10767457231 & 136 & 10 & 94282603 & 13250881338 & 467504832 & 3004731932 & 180807105 & 7939315965 \\ \hline
+        gross\_ppe & float64 & 10798 & 141 & 10657 & 0.01 & 10271 & 536860 & 6.47768E+11 & 16663711407 & 4916904923 & 40628206420 & 64 & 7 & 297049182 & 63281496031 & 1583485083 & 14392834779 & 589732739 & 38146000000 \\ \hline
+        net\_ppe & float64 & 10798 & 14 & 10784 & 0 & 10652 & 56022 & 4.66349E+11 & 8274557234 & 2443857615 & 20238826743 & 96 & 8 & 132594969 & 34048600996 & 781267103 & 7027353177 & 286647965 & 19867279366 \\ \hline
+        capex & float64 & 10798 & 0 & 10798 & 0 & 10428 & 212385 & 67882000000 & 1233582794 & 409820578 & 3059162139 & 85 & 8 & 36999039 & 4608948961 & 151404535 & 1034795150 & 66150245 & 2634263422 \\ \hline
+        intangible\_assets & float64 & 10798 & 0 & 10798 & 0 & 10395 & 3952 & 3.10197E+11 & 5397328780 & 1076039631 & 14815815604 & 93 & 8 & 10891843 & 23717987912 & 168884165 & 4257936079 & 35609813 & 12711201346 \\ \hline
+        lt\_debt & float64 & 10798 & 39 & 10759 & 0 & 10493 & 2639 & 1.6625E+11 & 6502468540 & 2222507827 & 13258088805 & 36 & 5 & 12904092 & 28206100000 & 579289141 & 6531712362 & 60272443 & 15319123538 \\ \hline
+        policy\_emissions\_score & float64 & 10798 & 2 & 10796 & 0 & 354 & 0 & 97 & 63 & 65 & 17 & 7 & -3 & 0 & 81 & 60 & 71 & 55 & 77 \\ \hline
+        target\_emissions\_score & float64 & 10798 & 80 & 10718 & 0.01 & 341 & 0 & 96 & 58 & 76 & 36 & -1 & -1 & 0 & 91 & 0 & 83 & 0 & 88 \\ \hline
+        s1\_co2e & float64 & 10798 & 0 & 10798 & 0 & 9699 & 0 & 257096000 & 3173737 & 99434 & 12244063 & 98 & 8 & 1431 & 16493200 & 14834 & 713148 & 3471 & 6459976 \\ \hline
+        s2\_co2e & float64 & 10798 & 0 & 10798 & 0 & 9493 & 0 & 45010000 & 693575 & 176486 & 1969251 & 166 & 10 & 6921 & 2940277 & 47000 & 547354 & 13945 & 1611236 \\ \hline
+        s1\_and\_s2\_co2e & float64 & 10798 & 0 & 10798 & 0 & 10205 & 114 & 272818700 & 3867313 & 360574 & 13437088 & 95 & 8 & 13191 & 18426560 & 88603 & 1641355 & 26200 & 7947619 \\ \hline
+        s3\_co2e & float64 & 10798 & 3943 & 6855 & 0.37 & 6634 & 0 & 5142900000 & 24250181 & 1211810 & 112587719 & 675 & 19 & 3529 & 108042100 & 103670 & 9029225 & 12895 & 42671800 \\ \hline
+        s3\_upstream & float64 & 10798 & 7799 & 2999 & 0.72 & 2949 & 46 & 360900000 & 5538481 & 1305518 & 18468908 & 156 & 11 & 12964 & 20029141 & 229623 & 4742469 & 37032 & 11615731 \\ \hline
+        s3\_downstream & float64 & 10798 & 8980 & 1818 & 0.83 & 1785 & 127 & 1351000000 & 36149937 & 2067000 & 118067357 & 50 & 6 & 23700 & 197445452 & 312567 & 17269010 & 56988 & 77171860 \\ \hline
+        s3\_cat\_total & float64 & 10798 & 7602 & 3196 & 0.7 & 3170 & 46 & 1637000000 & 25760479 & 2057960 & 101337559 & 107 & 9 & 15735 & 107980000 & 352344 & 10987028 & 49364 & 44152049 \\ \hline
+        s3\_purchased\_goods\_cat1 & float64 & 10798 & 8334 & 2464 & 0.77 & 2380 & 0 & 190000000 & 4513343 & 1184780 & 13568036 & 91 & 9 & 11931 & 16552950 & 243900 & 3961532 & 51010 & 8807234 \\ \hline
+        s3\_capital\_goods\_cat2 & float64 & 10798 & 8919 & 1879 & 0.83 & 1650 & 0 & 16724600 & 388769 & 112142 & 969807 & 85 & 8 & 881 & 1594266 & 31000 & 329000 & 6767 & 957606 \\ \hline
+        s3\_fuel\_energy\_cat3 & float64 & 10798 & 8450 & 2348 & 0.78 & 2033 & 0 & 360900000 & 1404960 & 56617 & 10393704 & 646 & 22 & 1396 & 4181750 & 11050 & 247000 & 3209 & 1287000 \\ \hline
+        s3\_transportation\_cat4 & float64 & 10798 & 8580 & 2218 & 0.79 & 1938 & 0 & 30180000 & 520609 & 80130 & 1939700 & 119 & 10 & 624 & 1900000 & 14596 & 364891 & 2387 & 923100 \\ \hline
+        s3\_waste\_cat5 & float64 & 10798 & 8563 & 2235 & 0.79 & 1691 & 0 & 13394000 & 46166 & 6200 & 315230 & 1444 & 35 & 54 & 163751 & 1055 & 25000 & 194 & 80299 \\ \hline
+        s3\_business\_travel\_cat6 & float64 & 10798 & 8199 & 2599 & 0.76 & 1923 & 0 & 1000000 & 21889 & 4684 & 57942 & 76 & 7 & 121 & 94078 & 1222 & 17698 & 362 & 53507 \\ \hline
+        s3\_employee\_commuting\_cat7 & float64 & 10798 & 8570 & 2228 & 0.79 & 1699 & 0 & 3500000 & 49899 & 12000 & 169538 & 244 & 13 & 396 & 193055 & 3471 & 38487 & 1000 & 110300 \\ \hline
+        s3\_leased\_assets\_cat8 & float64 & 10798 & 10011 & 787 & 0.93 & 482 & 0 & 3400000 & 42858 & 1051 & 201871 & 119 & 9 & 0 & 120500 & 0 & 11386 & 0 & 50278 \\ \hline
+        s3\_distribution\_cat9 & float64 & 10798 & 9837 & 961 & 0.91 & 770 & 0 & 19900000 & 536314 & 50100 & 1847069 & 52 & 7 & 0 & 2400000 & 6920 & 269000 & 637 & 929150 \\ \hline
+        s3\_processing\_products\_cat10 & float64 & 10798 & 10278 & 520 & 0.95 & 357 & 0 & 549000000 & 8100253 & 58033 & 57698544 & 81 & 9 & 0 & 13014000 & 29 & 769078 & 0 & 6146437 \\ \hline
+        s3\_use\_of\_sold\_cat11 & float64 & 10798 & 9302 & 1496 & 0.86 & 1434 & 0 & 1351000000 & 39409705 & 2502000 & 123859414 & 48 & 6 & 4598 & 231478250 & 242763 & 21205925 & 22217 & 82665000 \\ \hline
+        s3\_EOL\_treatment\_cat12 & float64 & 10798 & 9688 & 1110 & 0.9 & 955 & 0 & 127600000 & 1102599 & 42550 & 6415409 & 248 & 14 & 48 & 3928000 & 3206 & 364479 & 300 & 1663000 \\ \hline
+        s3\_leased\_assets\_cat13 & float64 & 10798 & 10235 & 563 & 0.95 & 379 & 0 & 10619400 & 240024 & 5167 & 931162 & 60 & 7 & 0 & 1044382 & 76 & 67298 & 0 & 399340 \\ \hline
+        s3\_franchises\_cat14 & float64 & 10798 & 10455 & 343 & 0.97 & 156 & 0 & 7430620 & 289080 & 5 & 1038747 & 24 & 5 & 0 & 1950539 & 0 & 14945 & 0 & 240731 \\ \hline
+        s3\_investments\_cat15 & float64 & 10798 & 10217 & 581 & 0.95 & 389 & 0 & 35286000 & 994776 & 28000 & 4255021 & 43 & 6 & 0 & 3304000 & 106 & 189665 & 0 & 1250460 \\ \hline
+    \end{tabular}
+    }
+    \label{tab:SampleSummary}
+    \fnote{Summary statistics of numeric variables in the full sample. Details of the sample's construction are given in Section \ref{sec:SampleConstruction}.}
+\end{table}
+\end{landscape}
+
+\chapter{Model Hyperparameters}\label{sec:ModelHyperparameters}
+
+\section{Quantile regression}
+
+\begin{table}[h]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|p{7cm}|p{6cm}|}
+\hline
+\textbf{Parameter} & \textbf{Description} & \textbf{Choice Set} \\ \hline
+\texttt{quantile} & The quantile to be predicted, which must be between 0 and 1 (exclusive). For example, 0.5 represents the median regression, 0.9 represents the 90th percentile, etc. & \{0.1, 0.25, 0.5, 0.75, 0.9\} \\ \hline
+\texttt{alpha} & Regularization strength; must be a non-negative float. Higher values imply stronger regularization. In practice, this controls the trade-off between bias and variance. Note that this applies if the quantile regression model is regularized. & \{0.01, 0.1, 0.5, 1.0, 10.0\} \\ \hline
+\texttt{solver} & Algorithm used for optimization. The choice of solver can affect the speed and accuracy of the model fitting process. & \{'highs-ds', 'highs-ipm', 'highs'\} \\ \hline
+\texttt{fit\_intercept} & Boolean indicating whether or not to fit the intercept. If \texttt{True}, the model will calculate the intercept. If \texttt{False}, no intercept will be used in the model. & \{True, False\} \\ \hline
+\end{tabular}
+}
+\caption{Hyperparameters of the Quantile Regression model in scikit-learn.}
+\label{table:quantile_regression_hyperparameters}
+\end{table}
+
+\newpage
+\section{Elastic Net}
+
+\begin{table}[h]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|p{7cm}|p{6cm}|}
+\hline
+\textbf{Parameter} & \textbf{Description} & \textbf{Choice Set} \\ \hline
+\texttt{alpha} & Regularization strength; must be a non-negative float. A higher value of \texttt{alpha} increases the amount of regularization, making the model more biased but potentially reducing variance. When \texttt{alpha} is set to 0, no regularization is applied, making the model equivalent to ordinary least squares regression. & \{1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0, 2.0, 5.0, 10.0, 100.0, 1000.0\} \\ \hline
+\texttt{l1\_ratio} & The mixing parameter that determines the balance between L1 (Lasso) and L2 (Ridge) regularization. \texttt{l1\_ratio} is a float between 0 and 1. When \texttt{l1\_ratio=1}, the penalty is purely L1 (Lasso). When \texttt{l1\_ratio=0}, the penalty is purely L2 (Ridge). Values between 0 and 1 provide a combination of both penalties. & \{0.0, 0.05, 0.1, \dots, 0.95\} \\ \hline
+\texttt{max\_iter} & The maximum number of iterations for the optimization algorithm to converge. If the algorithm does not converge within this number of iterations, it will stop. Increasing \texttt{max\_iter} may help achieve convergence, especially with large datasets or when strong regularization is applied. & \{10000\} \\ \hline
+\end{tabular}
+}
+\caption{Hyperparameters of the Elastic Net model in scikit-learn.}
+\label{table:elastic_net_hyperparameters}
+\end{table}
+
+\newpage
+\section{Multilayer perceptron}
+
+\begin{table}[h]
+\centering
+\resizebox{\textwidth}{!}{ 
+\begin{tabular}{|l|p{7cm}|p{6cm}|}
+\hline
+\textbf{Parameter} & \textbf{Description} & \textbf{Choice Set} \\ \hline
+\texttt{hidden\_layer\_sizes} & A tuple representing the number of neurons in each hidden layer. & \{(10,), (50,), (100,), (10,10), (50,50)\} \\ \hline
+\texttt{activation} & The activation function for the hidden layer. Options include \texttt{identity}, \texttt{logistic}, \texttt{tanh}, and \texttt{relu}. & \{'tanh', 'relu'\} \\ \hline
+\texttt{alpha} & L2 penalty (regularization term) parameter. This helps prevent overfitting by adding a penalty to the loss function. & \{1e-4, 1e-3, 1e-1\} \\ \hline
+\texttt{learning\_rate} & Controls the learning rate schedule for weight updates. Options include \texttt{constant}, \texttt{invscaling}, and \texttt{adaptive}. & \{'constant', 'invscaling', 'adaptive'\} \\ \hline
+\texttt{learning\_rate\_init} & The initial learning rate used. It controls the step size at each iteration while moving toward a minimum of the loss function. & \{0.1, 0.3, 0.5, 0.7, 0.9, 1.1\} \\ \hline
+\texttt{max\_iter} & The maximum number of iterations for the solver to converge. If the model does not converge within this number of iterations, the training stops. & \{1000, 1500, 2000\} \\ \hline
+\texttt{early\_stopping} & Whether to use early stopping to terminate training when validation score is not improving. & \{True, False\} \\ \hline
+\end{tabular}
+}
+\caption{Hyperparameters of the MLPRegressor model in scikit-learn.}
+\label{table:mlp_hyperparameters}
+\end{table}
+
+
+
+\newpage
+\section{K Nearest-Neighbours}
+
+\begin{table}[h]
+\centering
+\resizebox{\textwidth}{!}{  % Resize the table to fit the text width
+\begin{tabular}{|l|p{7cm}|p{6cm}|}
+\hline
+\textbf{Parameter} & \textbf{Description} & \textbf{Choice Set} \\ \hline
+\texttt{n\_neighbors} & The number of neighbors to use for making predictions. This controls how many nearest neighbors are averaged to make a prediction. & \{5, 10, 15, \dots, 500\} \\ \hline
+\texttt{weights} & The weighting function used to influence the prediction from the neighbors. Options include:
+\begin{itemize}
+    \item \texttt{uniform}: All neighbors contribute equally to the prediction.
+    \item \texttt{distance}: Closer neighbors contribute more to the prediction (weights are inversely proportional to distance).
+\end{itemize} & \{'uniform', 'distance'\} \\ \hline
+\texttt{algorithm} & The algorithm used to compute the nearest neighbors. Options include:
+\begin{itemize}
+    \item \texttt{auto}: Automatically chooses the best algorithm based on the values passed to \texttt{fit} method.
+    \item \texttt{ball\_tree}: Uses the BallTree algorithm.
+    \item \texttt{kd\_tree}: Uses the KDTree algorithm.
+    \item \texttt{brute}: Uses brute-force search.
+\end{itemize} & \{'auto', 'ball\_tree', 'kd\_tree', 'brute'\} \\ \hline
+\texttt{p} & Power parameter for the Minkowski distance metric. & \{3, 4\} \\ \hline
+\texttt{metric} & The distance metric to use for the tree. & \{'minkowski', 'euclidean', 'manhattan'\} \\ \hline
+\end{tabular}
+}
+\caption{Hyperparameters of the KNeighborsRegressor model in scikit-learn.}
+\label{table:knn_hyperparameters}
+\end{table}
+
+\newpage
+\section{XGBoost}
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|p{7cm}|p{6cm}|}
+\hline
+\textbf{Parameter} & \textbf{Description} & \textbf{Choice Set} \\ \hline
+\texttt{max\_depth} & The maximum depth of a tree. Increasing this value makes the model more complex and more likely to overfit. & \{6, 7, 8, 9, 10, 11\} \\ \hline
+\texttt{min\_child\_weight} & Minimum sum of instance weight (hessian) needed in a child. This parameter controls the complexity of the model by preventing the creation of nodes that only contain a few samples. A higher value prevents overfitting by making the algorithm more conservative. & \{1, 2, 3, 4, 5, 6, 7, 8\} \\ \hline
+\texttt{eta} & The learning rate, also known as \texttt{eta}. It scales the contribution of each tree by a factor (between 0 and 1) to prevent overfitting. Smaller values make the model more robust but require more trees. & \{0.00001, 0.0001, 0.005, 0.001, 0.05, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1\} \\ \hline
+\texttt{lambda} & L2 regularization term on weights. This helps to avoid overfitting by penalizing large coefficients. & \{0.00001, 0.0001, 0.005, 0.001, 0.05, 0.01, 0.1, 0.2, 0.3, 0.5, 1.0\} \\ \hline
+\texttt{subsample} & The fraction of samples to be used for fitting individual trees. This parameter can be used to prevent overfitting by sampling a random subset of data. The default is \texttt{1} (using all data). & \{0.5, 0.6, 0.7, 0.8, 0.9, 1.0\} \\ \hline
+\texttt{colsample\_bytree} & The fraction of features (columns) to be used when constructing each tree. Like \texttt{subsample}, it helps prevent overfitting by adding randomness. & \{0.5, 0.6, 0.7, 0.8, 0.9, 1.0\} \\ \hline
+\texttt{n\_estimators} & The number of boosting rounds (i.e., number of trees to fit). More boosting rounds can improve accuracy but increase training time. & Optimised using early stopping over folds, up to 1000. \\ \hline
+\texttt{scale\_pos\_weight} & Balancing of positive and negative weights, useful for unbalanced classes. It can make the algorithm converge faster and perform better on imbalanced datasets. & Not specified (use default) \\ \hline
+\texttt{booster} & The type of booster to use. Options include \texttt{'gbtree'}, \texttt{'gblinear'}, and \texttt{'dart'}. \texttt{'gbtree'} is used for tree-based models and is the default. & Not specified (use default) \\ \hline
+\end{tabular}
+}
+\caption{Hyperparameters of the XGBoost model in scikit-learn.}
+\label{table:xgboost_hyperparameters}
+\end{table}
+
+
+
+
+\newpage
+\section{Random Forest}
+
+\begin{table}[h]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|l|p{7cm}|p{6cm}|}
+\hline
+\textbf{Parameter} & \textbf{Description} & \textbf{Choice Set} \\ \hline
+\texttt{n\_estimators} & The number of trees in the forest. Increasing the number of trees generally improves performance but also increases computational cost. & \{100, 200, 300\} \\ \hline
+\texttt{max\_depth} & The maximum depth of each tree. Limiting the depth can prevent overfitting. If \texttt{None}, nodes are expanded until all leaves are pure or until all leaves contain fewer than \texttt{min\_samples\_split} samples. & \{3, 5, 10\} \\ \hline
+\texttt{min\_samples\_split} & The minimum number of samples required to split an internal node. Higher values prevent the model from learning overly specific patterns, which can reduce overfitting. & \{2, 10\} \\ \hline
+\texttt{min\_samples\_leaf} & The minimum number of samples that must be present in a leaf node. Setting this parameter to a higher value can smooth the model and prevent it from fitting noise in the data. & \{2, 5\} \\ \hline
+\texttt{max\_features} & The number of features to consider when looking for the best split. Options include auto, sqrt, and log2. & \{'sqrt', 'log2'\} \\ \hline
+\texttt{bootstrap} & Whether to use bootstrap samples when building trees. If \texttt{True}, each tree is built from a random subset of the data with replacement. & \{True, False\} \\ \hline
+\texttt{criterion} & The function to measure the quality of a split. Options include mean squared error 'mse', mean absolute error 'mae', and poisson. & \{'absolute\_error'\} \\ \hline
+\end{tabular}
+}
+\caption{Hyperparameters of the RandomForestRegressor model in scikit-learn.}
+\label{table:random_forest_hyperparameters}
+\end{table}
+
+
+
+\end{document}

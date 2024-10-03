@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "CarbonForecaster"
+version = "0.0.1"
+authors = [
+  { name="Michael Hollins", email="michaelhollins@hotmail.co.uk" },
+]
+description = "A package for cleaning and forecasting GHG emissions data"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/Michael-Hollins/Imperial_MSc_AI/"
+Issues = "https://github.com/Michael-Hollins/Imperial_MSc_AI/issues"
