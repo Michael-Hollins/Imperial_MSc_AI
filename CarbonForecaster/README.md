@@ -6,10 +6,10 @@ Welcome to my MSc thesis repository. This contains the codebase I have built "Ca
 
 The structure of the workflow is as follows. 
 
-![MLWorkFlow](https://github.com/user-attachments/assets/fb0b9c47-1050-47ba-ab9d-3ded51413741)
+![MLWorkFlow drawio (1)](https://github.com/user-attachments/assets/3da17446-e48e-4785-9142-d59ba5195940)
 
 ## Repository structure
-
+```
 CarbonForecaster/
 │
 ├── data/                                # Directory for data; only contains publicly-sourced data in the repo
@@ -43,3 +43,14 @@ CarbonForecaster/
 ├── README.md                            # You're reading it!
 ├── pyproject.toml                       # Toml used to build the package
 ├── requirements.txt                     # Python dependencies required to run the project
+```
+
+## Cloning the repository
+
+Open bash and run the following:
+
+```
+git clone https://github.com/Michael-Hollins/Imperial_MSc_AI.git
+cd Imperial_MSc_AI/CarbonForecaster
+pip install -r requirements.txt
+```
