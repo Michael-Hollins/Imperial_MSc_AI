@@ -18,7 +18,7 @@ CarbonForecaster/
 │   └── figures                          # Subdirectory for images used in the main report
 │   └── background_report.tex            # Background report (completed June 2024)
 │   └── references.bib                   # BibTex file for report bibliography
-│   └── scope3.tex                      # LaTeX file for the main thesis report
+│   └── scope3.tex                       # LaTeX file for the main thesis report
 ├── src/                                 # Directory containing the key source code for the project
 │   └── figures                          # Subdirectory for some generic charting functions
 │   └── models                           # Subdirectory for holding all pickled model objects
