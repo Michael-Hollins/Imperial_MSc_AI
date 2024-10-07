@@ -80,3 +80,9 @@ src/refinitiv-data.config.json
 
 # Results for me to inspect
 src/results/
+
+# Tests
+tests/
+
+# Presentations
+presentations/
